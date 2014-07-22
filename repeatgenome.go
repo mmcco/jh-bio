@@ -956,18 +956,20 @@ func (rg *RepeatGenome) GetReadClassChan(reads []TextSeq) chan ReadResponse {
     }
     runtime.GOMAXPROCS(int(numCPU))
 
-    responseChans := make([]chan ReadResponse, 500)      // should probably be buffered
+    responseChans := make([]chan ReadResponse, 0, numCPU)
 
     numReads := uint64(len(reads))
     var i uint64
     for i = 0; i < numCPU; i++ {
-        responseChans = append(responseChans, make(chan ReadResponse))
+        responseChans = append(responseChans, make(chan ReadResponse, 50))
         startInd := i * (numReads / numCPU)
         endInd := ((i + 1) * numReads) / numCPU
         go rg.ClassifyReads(reads[startInd : endInd], responseChans[i])
     }
 
     var wg sync.WaitGroup
+    //fmt.Println("GetReadClassChan() using %d chans for %d reads\n", len(responseChans), len(reads))
+    //os.Exit(0)
     wg.Add(len(responseChans))
     master := make(chan ReadResponse)
 
