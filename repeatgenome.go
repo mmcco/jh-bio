@@ -357,13 +357,14 @@ func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
 
             // maps each sequence name in this chrom to a slice of its sequence's lines
             // the list is concatenated at the end for efficiency's sake
-            seqMap := make(map[string][]TextSeq)
+            seqMap := make(map[string][][]byte)
             numLines := uint64(len(seqLines))
+            var seqName string = ""        // forward initialization necessary
             var i uint64
             for i = 0; i < numLines; i++ {
                 seqLine := bytes.TrimSpace(seqLines[i])
                 if seqLine[0] == byte('>') {
-                    seqName := string(bytes.TrimSpace(seqLine[1:]))
+                    seqName = string(bytes.TrimSpace(seqLine[1:]))
                     if !warned && seqName != chromFilename[:len(chromFilename)-3] {
                         fmt.Println("WARNING: reference genome is two-dimensional, containing sequences not named after their chromosome.")
                         fmt.Println("Because RepeatMasker supplied only one-dimensional indexing, this may cause unexpected behavior or program failure.")
@@ -372,14 +373,17 @@ func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
                         warned = true
                     }
                 } else {
+                    if seqName == "" {
+                        return ParseError{"repeatgenome.parseGenome", chromFilepath, fmt.Errorf("Empty or missing sequence name")}, nil
+                    }
                     seqMap[seqName] = append(seqMap[seqName], seqLine)
                 }
             }
             // finally, we insert this map into the full map
             chromName := chromFilepath[len(genomeName)+1 : len(chromFilepath)-3]
             chroms[chromName] = make(map[string]TextSeq)
-            for k, v := range seqMap {
-                chroms[chromName][k] = bytes.ToLower(bytes.Join(v, TextSeq{}))
+            for seqName, seqLines := range seqMap {
+                chroms[chromName][seqName] = TextSeq(bytes.ToLower(bytes.Join(seqLines, []byte{})))
             }
         }
     }
@@ -459,7 +463,7 @@ func (rg *RepeatGenome) RunDebugTests() {
     fmt.Println("max64(int64(5), int64(7)):", max64(int64(5), int64(7)))
     fmt.Println()
 
-    const testSeq TextSeq = TextSeq("atgtttgtgtttttcataaagacgaaagatg")
+    testSeq := TextSeq("atgtttgtgtttttcataaagacgaaagatg")
     offset, thisMin := getMinimizer(seqToInt(testSeq), uint8(len(testSeq)), 15)
     fmt.Println("getMinimizer('tgctcctgtcatgcatacgcaggtcatgcat', 15) offset :", offset)
     printSeqInt(thisMin, 15)
@@ -795,14 +799,13 @@ func (rg *RepeatGenome) populateKraken(minCache map[uint64]uint64, kmerMap map[u
 func (rg *RepeatGenome) numKmers() uint64 {
     var k = int(rg.K)
     var numKmers uint64 = 0
-    var seqs []TextSeq
 
     splitOnN := func(c rune) bool { return c == 'n' }
 
     for i := range rg.Matches {
         match := &rg.Matches[i]
         seq := rg.chroms[match.SeqName][match.SeqName][match.SeqStart:match.SeqEnd]
-        seqs = bytes.FieldsFunc(seq, splitOnN)
+        seqs := bytes.FieldsFunc([]byte(seq), splitOnN)
         for j := range seqs {
             if len(seqs[j]) >= k {
                 numKmers += uint64(len(seqs[j]) - k + 1)
@@ -907,7 +910,7 @@ func (rg *RepeatGenome) ClassifyReads(reads []TextSeq, responseChan chan ReadRes
 
 
 ReadLoop:
-    for _, readSeq := reads {
+    for _, readSeq := range reads {
         k_ := int64(rg.K)
         numKmers := int64(len(readSeq)) - k_ + 1
 
@@ -953,7 +956,7 @@ func (rg *RepeatGenome) GetReadClassChan(reads []TextSeq) chan ReadResponse {
     }
     runtime.GOMAXPROCS(int(numCPU))
 
-    responseChans := make([]chan ReadResponse)      // should probably be buffered
+    responseChans := make([]chan ReadResponse, 500)      // should probably be buffered
 
     numReads := uint64(len(reads))
     var i uint64
@@ -983,4 +986,35 @@ func (rg *RepeatGenome) GetReadClassChan(reads []TextSeq) chan ReadResponse {
     }()
 
     return master
+}
+
+func (rg *RepeatGenome) ProcessReads() (error, chan ReadResponse) {
+    workingDirName, err := os.Getwd()
+    if err != nil {
+        return err, nil
+    }
+    readsDirName := workingDirName + "/" + rg.Name + "-reads"
+    currDir, err := os.Open(readsDirName)
+    if err != nil {
+        return err, nil
+    }
+    fileinfos, err := currDir.Readdir(-1)
+    if err != nil {
+        return err, nil
+    }
+    processedFiles := []os.FileInfo{}
+    for _, fileinfo := range fileinfos {
+        if len(fileinfo.Name()) > 5 && fileinfo.Name()[len(fileinfo.Name())-5 : ] == ".proc" {
+            processedFiles = append(processedFiles, fileinfo)
+        }
+    }
+    var reads []TextSeq
+    for _, fileinfo := range processedFiles {
+        _, theseReadsBytes := fileLines(readsDirName + "/" + fileinfo.Name())
+        for _, bytesLine := range theseReadsBytes {
+            reads = append(reads, TextSeq(bytesLine))
+        }
+    }
+
+    return nil, rg.GetReadClassChan(reads)
 }

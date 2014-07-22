@@ -17,7 +17,7 @@ import (
 
 type ParseError struct {
     FuncName string
-    Filename string
+    Filepath string
     SubError error
 }
 
@@ -27,10 +27,10 @@ type IOError struct {
 }
 
 func (parseError ParseError) Error() string {
-    if len(parseError.Filename) == 0 {
+    if len(parseError.Filepath) == 0 {
         return fmt.Sprintf("%s: parsing error: %s", parseError.FuncName, parseError.SubError.Error())
     } else {
-        return fmt.Sprintf("%s: parsing error in file %s: %s", parseError.FuncName, parseError.Filename, parseError.SubError.Error())
+        return fmt.Sprintf("%s: parsing error in file %s: %s", parseError.FuncName, parseError.Filepath, parseError.SubError.Error())
     }
 }
 
