@@ -15,13 +15,11 @@ package repeatgenome
 
    Should probably make a file solely for type defs.
 
-   Error handling should be updated with a custom ParseError type and removal fo checkError()
+   Error handling should be updated with a custom ParseError type
 
    For portability's sake, the flags should be used as args to Generate() rather than globals.
 
    Minimizers could be stored as uint32's.
-
-   Should switch from strings to byte slices.
 
    The concurrent read-kmer generator could be reintroduced using a select statement.
 
@@ -80,24 +78,24 @@ type Flags struct {
 }
 
 // Match.SW_Score - Smith-Waterman score, describing the likeness to the repeat reference sequence
-// Match.PercDiv
-// Match.PercDel
-// Match.PercIns
+// Match.PercDiv - "% substitutions in matching region compared to the consensus" - RepeatMasker docs
+// Match.PercDel - "% of bases opposite a gap in the query sequence (deleted bp)" - RepeatMasker docs
+// Match.PercIns - "% of bases opposite a gap in the repeat consensus (inserted bp)" - RepeatMasker docs
 // Match.SeqName -  the reference genome file this match came from (typically the chromosome)
 // Match.SeqStart -  the starting index (inclusive) in the reference genome
 // Match.SeqEnd -  the ending index (exclusive) in the reference genome
-// Match.SeqRemains
+// Match.SeqRemains - the number of bases past the end of the match in the relevant reference seqence
 // Match.IsRevComp -  the match may be for the complement of the reference sequence
 // Match.RepeatClass - the repeat's full ancestry, including its repeat class and repeat name (which are listed separately in the RepeatMasker output file)
 // Match.RepeatStart-  the starting index in the repeat consensus sequence
-// Match.RepeatEnd -  the ending sequence (exclusive) in the repeat consensus sequence
-// Match.RepeatRemains
+// Match.RepeatEnd -  the ending sequence (exclusive) in the consensus repeat  sequence
+// Match.RepeatRemains - the number of bases past the end of the match in the consensus repeat sequence
 // Match.InsertionID - a numerical ID for the repeat type (starts at 1)
-
+//
 //     below are not in parsed data file
 // Match.RepeatName - simply repeatClass concatenated - used for printing and map indexing
-// Match.ClassNode
-// Match.Repeat
+// Match.ClassNode - pointer to corresponding ClassNode in RepeatGenome.ClassTree
+// Match.Repeat - pointer to corresponding Repeat struct in RepeatGenome.Repeats
 type Match struct {
     SW_Score    int32
     PercDiv     float64
@@ -205,7 +203,7 @@ type ClassNode struct {
 // type synonyms, necessary to implement interfaces (e.g. sort) and methods
 type Kmers []Kmer
 type PKmers []*Kmer
-type MinMap map[uint64]PKmers
+type MinMap map[uint64]Kmers
 type Repeats []Repeat
 type Matches []Match
 
@@ -507,7 +505,6 @@ func (rg *RepeatGenome) getClassTree() {
     // mapping to pointers allows us to make references (i.e. pointers) to values
     tree := &rg.ClassTree
     tree.ClassNodes = make(map[string](*ClassNode))
-    tree.NodesByID = make([]*ClassNode, 0)
     // would be prettier if expanded
     tree.Root = &ClassNode{"root", 0, []string{"root"}, nil, nil, true, nil}
     tree.ClassNodes["root"] = tree.Root
@@ -571,31 +568,25 @@ func (rg *RepeatGenome) getClassTree() {
     }
 }
 
-// returns ancestry list, from self to root
+// returns ancestry list, beginning at (and including) self, excluding root
 func (cn *ClassNode) getAncestry() []*ClassNode {
-    // condition to prevent nil dereference of Root.Parent
-    if cn.IsRoot {
-        return []*ClassNode{}
-    }
-    ancestry := []*ClassNode{cn.Parent}
-    for !ancestry[len(ancestry)-1].IsRoot {
-        ancestry = append(ancestry, ancestry[len(ancestry)-1].Parent)
+    ancestry := []*ClassNode{}
+    walker := cn
+    for !walker.IsRoot {
+        ancestry = append(ancestry, walker)
+        walker = walker.Parent
     }
     return ancestry
 }
 
 func (classTree *ClassTree) getLCA(cnA, cnB *ClassNode) *ClassNode {
-    ancestryA := cnA.getAncestry()
-    cnBWalker := cnB
-    for cnBWalker != classTree.Root {
-        for i := 0; i < len(ancestryA); i++ {
-            if cnBWalker == ancestryA[i] {
+    for cnBWalker := cnB; cnBWalker != classTree.Root; cnBWalker = cnBWalker.Parent {
+        for cnAWalker := cnA; cnAWalker != classTree.Root; cnAWalker = cnAWalker.Parent {
+            if cnBWalker == cnAWalker {
                 return cnBWalker
             }
         }
-        cnBWalker = cnBWalker.Parent
     }
-    // necessary for compilation - Root should be in the ancestry paths
     return classTree.Root
 }
 
@@ -646,9 +637,6 @@ func (rg *RepeatGenome) minimizeThread(matchStart, matchEnd uint64, c chan Threa
     close(c)
 }
 
-func (rg *RepeatGenome) CoordMinimizerThreads() {
-}
-
 func (rg *RepeatGenome) getKrakenSlice() error {
     // a rudimentary way of deciding how many threads to allow, should eventually be improved
     numCPU := runtime.NumCPU()
@@ -675,13 +663,9 @@ func (rg *RepeatGenome) getKrakenSlice() error {
     // below is the atomic section of minimizing, which is parallel
     // this seems to be the rate-limiting section, as threads use only ~6-7 CPU-equivalents
     // it should therefore be optimized before other sections
-    var kmer *Kmer
-    var kmersProcessed, kmerInt, minimizer uint64
-    var lca_ID uint16
-    var lca, relative *ClassNode
-    var exists bool
     minCache := make(map[uint64]uint64)
-    kmerMap := make(map[uint64]*Kmer)
+    kmerMap := make(map[uint64]Kmer)
+    var kmersProcessed uint64 = 0
 
     for response := range mergeThreadResp(threadChans) {
         if kmersProcessed%5000000 == 0 {
@@ -689,16 +673,18 @@ func (rg *RepeatGenome) getKrakenSlice() error {
         }
         kmersProcessed++
 
-        kmerInt, minimizer, relative = response.KmerInt, response.Minimizer, response.Relative
+        kmerInt, minimizer, relative := response.KmerInt, response.Minimizer, response.Relative
         minCache[kmerInt] = minimizer
 
-        kmer, exists = kmerMap[kmerInt]
-        if exists {
-            lca_ID = *(*uint16)(unsafe.Pointer(&kmer[8]))
-            lca = rg.ClassTree.getLCA(rg.ClassTree.NodesByID[lca_ID], relative)
+        
+        // if this kmer has already been seen, we just update its LCA...
+        if kmer, exists := kmerMap[kmerInt]; exists {
+            lca_ID := *(*uint16)(unsafe.Pointer(&kmer[8]))
+            lca := rg.ClassTree.getLCA(rg.ClassTree.NodesByID[lca_ID], relative)
             *(*uint16)(unsafe.Pointer(&kmer[8])) = lca.ID
+            kmerMap[kmerInt] = kmer
+        // ...otherwise we initialize it in the kmerMap
         } else {
-            kmer = new(Kmer)
             *(*uint64)(unsafe.Pointer(&kmer[0])) = kmerInt
             *(*uint16)(unsafe.Pointer(&kmer[8])) = relative.ID
             kmerMap[kmerInt] = kmer
@@ -714,7 +700,7 @@ func (rg *RepeatGenome) getKrakenSlice() error {
     return rg.populateKraken(minCache, kmerMap)
 }
 
-func (rg *RepeatGenome) populateKraken(minCache map[uint64]uint64, kmerMap map[uint64]*Kmer) error {
+func (rg *RepeatGenome) populateKraken(minCache map[uint64]uint64, kmerMap map[uint64]Kmer) error {
     if len(kmerMap) != len(minCache) {
         panic("lengths of kmerMap and minCache are incompatible")
     }
@@ -730,7 +716,7 @@ func (rg *RepeatGenome) populateKraken(minCache map[uint64]uint64, kmerMap map[u
         if kmers, exists := minMap[minimizer]; exists {
             minMap[minimizer] = append(kmers, kmer)
         } else {
-            minMap[minimizer] = PKmers{kmer}
+            minMap[minimizer] = Kmers{kmer}
         }
         delete(kmerMap, kmerInt)
     }
@@ -780,7 +766,7 @@ func (rg *RepeatGenome) populateKraken(minCache map[uint64]uint64, kmerMap map[u
         rg.OffsetsToMin[thisMin] = currOffset
         currOffset += uint64(len(minMap[thisMin]))
         for _, kmer := range minMap[thisMin] {
-            rg.Kmers = append(rg.Kmers, *kmer)
+            rg.Kmers = append(rg.Kmers, kmer)
         }
         delete(minMap, thisMin)
     }
@@ -837,11 +823,10 @@ func (rg *RepeatGenome) getKmer(kmerInt uint64) *Kmer {
         panic("minimizer's kmers not sorted")
     }
 
-    xs := make([]uint64, 0, 0)
+    // simple binary search within the range of RepeatGenome.Kmers that has this kmer's minimizer
     i, j := startInd, endInd
     for i < j {
         x := (j+i)/2
-        xs = append(xs, x)
         thisKmerInt := *(*uint64)(unsafe.Pointer(&rg.Kmers[x][0]))
         if thisKmerInt == kmerInt {
             return &rg.Kmers[x]
@@ -861,7 +846,6 @@ type SeqAndClass struct {
 }
 
 /*
-// not that the caller is responsible for closing the channel
 func (rg *RepeatGenome) kmerSeqFeed(seq TextSeq) chan uint64 {
     c := make(chan uint64)
 
@@ -968,8 +952,6 @@ func (rg *RepeatGenome) GetReadClassChan(reads []TextSeq) chan ReadResponse {
     }
 
     var wg sync.WaitGroup
-    //fmt.Println("GetReadClassChan() using %d chans for %d reads\n", len(responseChans), len(reads))
-    //os.Exit(0)
     wg.Add(len(responseChans))
     master := make(chan ReadResponse)
 

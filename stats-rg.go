@@ -59,7 +59,7 @@ func (classNode *ClassNode) Size() uint64 {
     return classNodeSize
 }
 
-func (readResp ReadResponse) HangingSize() uint64 {
+func (readResp ReadResponse) HangingSize(k uint8) uint64 {
     classNode := readResp.ClassNode
     if classNode == nil {
         return 0
@@ -70,12 +70,12 @@ func (readResp ReadResponse) HangingSize() uint64 {
     if classNode.Repeat != nil {
         for _, match := range classNode.Repeat.Instances {
             classNodeSize += match.SeqEnd - match.SeqStart
-            // classNodeSize += 2 * (ReadResp.
+            classNodeSize += 2 * uint64(len(readResp.Seq) - int(k))
         }
     }
 
     for _, child := range classNode.Children {
-        classNodeSize += child.Size()
+        classNodeSize += ReadResponse{readResp.Seq, child}.HangingSize(k)
     }
 
     return classNodeSize
@@ -83,11 +83,18 @@ func (readResp ReadResponse) HangingSize() uint64 {
 
 // returns the average percent of the genome that a classified read could exist in, in regard to the supplied list of classified reads
 // uses a cumulative average to prevent overflow
-func (rg RepeatGenome) AvgPossPercentGenome(resps []ReadResponse) float64 {
+func (rg *RepeatGenome) AvgPossPercentGenome(resps []ReadResponse, strict bool) float64 {
     classNodeSizes := make(map[*ClassNode]float64, len(rg.ClassTree.ClassNodes))
-    for i := range rg.ClassTree.NodesByID {
-        classNode := rg.ClassTree.NodesByID[i]
-        classNodeSizes[classNode] = float64(classNode.Size())
+    if strict {
+        for _, classNode := range rg.ClassTree.NodesByID {
+            classNodeSizes[classNode] = float64(classNode.Size())
+        }
+    } else {
+        for _, resp := range resps {
+            if _, exists := classNodeSizes[resp.ClassNode]; !exists {
+                classNodeSizes[resp.ClassNode] = float64(resp.HangingSize(rg.K))
+            }
+        }
     }
 
     var classesProcessed, avgClassSize float64 = 0, 0

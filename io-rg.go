@@ -110,11 +110,7 @@ func (repeatGenome *RepeatGenome) WriteMins(minMap MinMap) error {
     writer := bufio.NewWriter(outfile)
     defer writer.Flush()
 
-    var kmers PKmers
-    var thisMin, kmerSeqInt uint64
-    var lcaID uint16
-
-    for thisMin, kmers = range minMap {
+    for thisMin, kmers := range minMap {
         fillKmerBuf(minBuf, thisMin)
         _, err = fmt.Fprintf(writer, ">%s\n", minBuf)
         if err != nil {
@@ -122,8 +118,8 @@ func (repeatGenome *RepeatGenome) WriteMins(minMap MinMap) error {
         }
 
         for i := range kmers {
-            kmerSeqInt = *(*uint64)(unsafe.Pointer(&kmers[i][0]))
-            lcaID = *(*uint16)(unsafe.Pointer(&kmers[i][8]))
+            kmerSeqInt := *(*uint64)(unsafe.Pointer(&kmers[i][0]))
+            lcaID := *(*uint16)(unsafe.Pointer(&kmers[i][8]))
             fillKmerBuf(kmerBuf, kmerSeqInt)
             _, err = fmt.Fprintf(writer, "\t%s %s\n", kmerBuf, repeatGenome.ClassTree.NodesByID[lcaID].Name)
             if err != nil {
