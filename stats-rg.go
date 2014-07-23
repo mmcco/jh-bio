@@ -108,29 +108,29 @@ func (rg *RepeatGenome) AvgPossPercentGenome(resps []ReadResponse, strict bool) 
 
 // written for the PercentTrueClassification() below
 // determines whether a read overlaps any repeat instances in the given ClassNode's subtree
-func recNodeSearch(classNode *ClassNode, readSAM ReadSAM) bool {
+func (rg *RepeatGenome) recNodeSearch(classNode *ClassNode, readSAM ReadSAM, strict bool) bool {
     if classNode != nil && classNode.Repeat != nil {
         for _, match := range classNode.Repeat.Instances {
             // must compute where the read ends
             endInd := readSAM.StartInd + uint64(len(readSAM.Seq))
-            if readSAM.SeqName == match.SeqName && readSAM.StartInd < match.SeqEnd && endInd > match.SeqStart {
+            overlap := readSAM.SeqName == match.SeqName && readSAM.StartInd < match.SeqEnd && endInd > match.SeqStart
+            if overlap && !strict {
                 return true
+            } else if overlap && strict {
                 // below logic is for checking for at least rg.K overlap
-                /*
-                var overlap uint64 := readSAM.SeqEnd - match.SeqStart
-                if readSAM.SeqStart > match.SeqStart {
-                    overlap -= readSAM.SeqStart - match.SeqStart
+                var overlap uint64 = endInd - match.SeqStart
+                if readSAM.StartInd > match.SeqStart {
+                    overlap -= readSAM.StartInd - match.SeqStart
                 }
                 if overlap >= uint64(rg.K) {
                     return true
                 }
-                */
             }
         }
     }
     if classNode != nil && classNode.Children != nil {
         for _, child := range classNode.Children {
-            if recNodeSearch(child, readSAM) {
+            if rg.recNodeSearch(child, readSAM, strict) {
                 return true
             }
         }
@@ -184,14 +184,14 @@ func TestNodeSearch(classNode *ClassNode, readSAM ReadSAM) bool {
 */
 
 // we currently use the simple metric that the read and one of the repeat's instances overlap at all
-func (rg *RepeatGenome) PercentTrueClassifications(responses []ReadSAMResponse) float64 {
+func (rg *RepeatGenome) PercentTrueClassifications(responses []ReadSAMResponse, strict bool) float64 {
     var classifications, correctClassifications uint64 = 0, 0
 
     for _, resp := range responses {
         if resp.ClassNode != nil {
             classifications++
         }
-        if recNodeSearch(resp.ClassNode, resp.ReadSAM) {
+        if rg.recNodeSearch(resp.ClassNode, resp.ReadSAM, strict) {
             correctClassifications++
         }
     }

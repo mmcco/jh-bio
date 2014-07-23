@@ -334,14 +334,14 @@ type ReadSAMResponse struct {
     ClassNode *ClassNode
 }
 
-func ParseReadSAMs(filepath string) (error, []ReadSAM) {
+func parseReadSAMs(filepath string) (error, []ReadSAM) {
     err, lines := fileLines(filepath)
     if err != nil {
         return err, nil
     }
 
     if len(lines) < 3 {
-        err := ParseError{"ParseReadSAMs()", filepath, fmt.Errorf("only %d lines in SAM file - need at least three", len(lines))}
+        err := ParseError{"parseReadSAMs()", filepath, fmt.Errorf("only %d lines in SAM file - need at least three", len(lines))}
         return err, nil
     }
 
@@ -352,7 +352,7 @@ func ParseReadSAMs(filepath string) (error, []ReadSAM) {
     for i, line := range lines {
         fields := bytes.Fields(line)
         if len(fields) != 12 {
-            err := ParseError{"ParseReadSAMs()", filepath, fmt.Errorf("SAM line has %d fields - 12 expected", len(fields))}
+            err := ParseError{"parseReadSAMs()", filepath, fmt.Errorf("SAM line has %d fields - 12 expected", len(fields))}
             return err, nil
         }
         
@@ -364,6 +364,38 @@ func ParseReadSAMs(filepath string) (error, []ReadSAM) {
         }
         // start index is 1 in the SAM standard
         readSAMs[i].StartInd--
+    }
+
+    return nil, readSAMs
+}
+
+// passes all file names in the dir to parseReadSAMs and returns the concatenated results
+func GetReadSAMs(readsDirPath string) (error, []ReadSAM) {
+    currDir, err := os.Open(readsDirPath)
+    if err != nil {
+        return err, nil
+    }
+
+    fileinfos, err := currDir.Readdir(-1)
+    if err != nil {
+        return err, nil
+    }
+
+    var samFiles []os.FileInfo
+    for _, fileinfo := range fileinfos {
+        if len(fileinfo.Name()) > 10 && fileinfo.Name()[len(fileinfo.Name())-10 : ] == ".fasta.sam" {
+            samFiles = append(samFiles, fileinfo)
+        }
+    }
+    readSAMs := []ReadSAM{}
+    for _, samFile := range samFiles {
+        err, theseReadSAMs := parseReadSAMs(readsDirPath + "/" + samFile.Name())
+        if err != nil {
+            return err, nil
+        }
+        for _, readSAM := range theseReadSAMs {
+            readSAMs = append(readSAMs, readSAM)
+        }
     }
 
     return nil, readSAMs

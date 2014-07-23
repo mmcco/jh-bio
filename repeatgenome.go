@@ -455,6 +455,9 @@ func (rg *RepeatGenome) RunDebugTests() {
     fmt.Println()
 
     fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['DNA/TcMar-Mariner'], rg.ClassTree.ClassNodes['DNA/TcMar-Tc1']).Name:", rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["DNA/TcMar-Mariner"], rg.ClassTree.ClassNodes["DNA/TcMar-Tc1"]).Name)
+    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['ARTEFACT'], rg.ClassTree.ClassNodes['DNA/TcMar-Tc1']).Name:", rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["ARTEFACT"], rg.ClassTree.ClassNodes["DNA/TcMar-Tc1"]).Name)
+    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['LINE/LOA'], rg.ClassTree.ClassNodes['root']).Name:", rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["LINE/LOA"], rg.ClassTree.ClassNodes["root"]).Name)
+    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['Simple_repeat/(T)n'], rg.ClassTree.ClassNodes['Simple_repeat/(T)n']).Name:", rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["Simple_repeat/(T)n"], rg.ClassTree.ClassNodes["Simple_repeat/(T)n"]).Name)
 
     fmt.Println()
     fmt.Println("min(5, 7):", min(5, 7))
