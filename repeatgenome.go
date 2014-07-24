@@ -15,17 +15,25 @@ package repeatgenome
 
    KmerInt.Minimize() logic could be changed now that minimizers are 32 bits
 
+   Should a Seq's first field be a *byte to discard the extra two fields?
+
    Should probably make a file solely for type defs.
+
+   Reads are currently kept in TextSeq form until the bitter end because, with Go's referenced based slices, there's no compelling reason not to, and because they're easier (and probably faster) to manipulate than Seqs. This may change at some point, though.
 
    If a minimizer is associated with a single repeat type, can we use that heuristically?
 
-   Error handling should be updated with a custom ParseError type
+   Error handling should be updated with a custom ParseError type - panics should be removed, excepting performance-cricial sequence manipulation functions
+
+   Should consider splitting at hyphenated class names like TcMar-Tc1
 
    For portability's sake, the flags should be used as args to Generate() rather than globals.
 
    The concurrent read-kmer generator could be reintroduced using a select statement.
 
    Should probably restrict activity of chans with directionals
+
+   It would make sense to discard kmers associated with ClassNodes greater than a certain size.
 
    Kmer counting should be re-added eventually - it's currently excluded for performance reasons because we aren't using it.
 
@@ -635,10 +643,12 @@ func (rg *RepeatGenome) minimizeThread(matchStart, matchEnd uint64, c chan Threa
             kmerInt = minKmerInt(kmerInt, kmerInt.revComp(k))
 
             thisMin := kmerInt.Minimize(k, m)
+            /*
             if match.ClassNode == nil {
                 fmt.Println("current match's repeat:", match.RepeatName)
                 panic("minimizeThread(): match has nil ClassNode")
             }
+            */
             c <- ThreadResponse{kmerInt, thisMin, match.ClassNode}
         }
     }
@@ -690,6 +700,18 @@ func (rg *RepeatGenome) getKrakenSlice() error {
         if kmer, exists := kmerMap[kmerInt]; exists {
             prev_LCA_ID := *(*uint16)(unsafe.Pointer(&kmer[8]))
             lca := rg.ClassTree.getLCA(rg.ClassTree.NodesByID[prev_LCA_ID], relative)
+
+            /*
+            prevLCA := rg.ClassTree.NodesByID[prev_LCA_ID]
+            if lca != rg.ClassTree.Root && !(strings.HasPrefix(prevLCA.Name, lca.Name) && strings.HasPrefix(relative.Name, lca.Name)) {
+                fmt.Println()
+                fmt.Println("prev LCA:", prevLCA.Name)
+                fmt.Println("relative:", relative.Name)
+                fmt.Println("new LCA:", lca.Name)
+                panic("fatal LCA error")
+            }
+            */
+
             *(*uint16)(unsafe.Pointer(&kmer[8])) = lca.ID
             kmerMap[kmerInt] = kmer
         // ...otherwise we initialize it in the kmerMap
@@ -885,11 +907,14 @@ func (rg *RepeatGenome) kmerSeqFeed(seq TextSeq) chan uint64 {
 */
 
 type ReadResponse struct {
-    Seq       []byte
+    Seq       TextSeq
     ClassNode *ClassNode
 }
 
-func (rg *RepeatGenome) ClassifyReads(reads []TextSeq, responseChan chan ReadResponse) {
+// This function assumes that the Seqs in readSeqs do not contain 'n's.
+// The output reads of sequencing simulators will generally contain 'n's if the input reference genome does.
+// They must therefore be filtered upstream.
+func (rg *RepeatGenome) ClassifyReads(readTextSeqs []TextSeq, responseChan chan ReadResponse) {
     var kmerSet map[KmerInt]bool
     var byteBuf TextSeq
     if rg.Flags.Debug {
@@ -903,22 +928,25 @@ func (rg *RepeatGenome) ClassifyReads(reads []TextSeq, responseChan chan ReadRes
 
 
 ReadLoop:
-    for _, readSeq := range reads {
+    for _, read := range readTextSeqs {
+        // we use sign int64s in this triple-nested loop because the innermost one counts down and would otherwise overflow
+        // this isn't a significant limitation because reads are never big enough to overflow one
         k_ := int64(rg.K)
-        numKmers := int64(len(readSeq)) - k_ + 1
+        numKmers := int64(len(read)) - k_ + 1
 
         var i int64
     KmerLoop:
         for i = 0; i < numKmers; i++ {
 
+            // if this is ever revived, all the loop ints must be made signed again
             for j := k_ + i - 1; j >= i ; j-- {
-                if readSeq[j] == byte('n') {
+                if read[j] == byte('n') {
                     i += j - i
                     continue KmerLoop
                 }
             }
 
-            kmerBytes := TextSeq(readSeq[i : i+k_])
+            kmerBytes := read[i : i+k_]
             kmerInt := kmerBytes.kmerInt()
             kmerInt = minKmerInt(kmerInt, kmerInt.revComp(rg.K))
             kmer := rg.getKmer(kmerInt)
@@ -931,12 +959,12 @@ ReadLoop:
             if kmer != nil {
                 fillKmerBuf(byteBuf, kmerInt)
                 lcaID := *(*uint16)(unsafe.Pointer(&kmer[8]))
-                responseChan <- ReadResponse{readSeq, rg.ClassTree.NodesByID[lcaID]}
+                responseChan <- ReadResponse{read, rg.ClassTree.NodesByID[lcaID]}
                 // only use the first matched kmer
                 continue ReadLoop
             }
         }
-        responseChan <- ReadResponse{readSeq, nil}
+        responseChan <- ReadResponse{read, nil}
     }
     close(responseChan)
 }
