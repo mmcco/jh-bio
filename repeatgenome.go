@@ -134,20 +134,19 @@ type RepeatGenome struct {
     Flags Flags
     // maps a chromosome name to a map of its sequences
     // as discussed above, though, matches only contain 1D sequence indexes
-    chroms        map[string](map[string]TextSeq)
-    K             uint8
-    M             uint8
-    Kmers         Kmers
-    // stores the offset of each minimizer's first kmer in RepeatGenome.Kmers
-    OffsetsToMin  map[MinInt]uint64
+    chroms         map[string](map[string]TextSeq)
+    K              uint8
+    M              uint8
+    Kmers          Kmers
+    // stores the offset of each minimizer's first kmer in RepeatGenome.Kmers - indexed by the minimizer's index in SortedUniqMins
+    OffsetsToMin   []uint64
     // stores the number of kmers that each minimizer is associated with
-    MinCounts     map[MinInt]uint64
-    SortedMins    MinInts
-    Matches       Matches
-    ClassTree     ClassTree
-    Repeats       Repeats
-    RepeatMap     map[string]*Repeat
-    memProfFile   *os.File
+    SortedUniqMins MinInts
+    Matches        Matches
+    ClassTree      ClassTree
+    Repeats        Repeats
+    RepeatMap      map[string]*Repeat
+    memProfFile    *os.File
 }
 
 type ClassTree struct {
@@ -233,7 +232,7 @@ type MinPair struct {
 
 type ThreadResponse struct {
     KmerInt   KmerInt
-    Minimizer MinInt
+    MinInt    MinInt
     Relative *ClassNode
 }
 
@@ -679,11 +678,10 @@ func (rg *RepeatGenome) getKrakenSlice() error {
         go rg.minimizeThread(mStart, mEnd, c)
     }
 
-    // below is the atomic section of minimizing, which is parallel
-    // this seems to be the rate-limiting section, as threads use only ~6-7 CPU-equivalents
-    // it should therefore be optimized before other sections
-    minCache := make(MinCache)
-    kmerMap := make(map[KmerInt]Kmer)
+    // below is the atomic section of minimizing
+    // this seems to be the rate-limiting section, as 24+ goroutines use only ~9-10 CPU-equivalents
+    // it should therefore be optimized first
+    minToKmers := make(map[MinInt]Kmers)
     var kmersProcessed uint64 = 0
 
     for response := range mergeThreadResp(threadChans) {
@@ -692,33 +690,48 @@ func (rg *RepeatGenome) getKrakenSlice() error {
         }
         kmersProcessed++
 
-        kmerInt, minimizer, relative := response.KmerInt, response.Minimizer, response.Relative
-        minCache[kmerInt] = minimizer
-
+        kmerInt, minInt, relative := response.KmerInt, response.MinInt, response.Relative
         
-        // if this kmer has already been seen, we just update its LCA...
-        if kmer, exists := kmerMap[kmerInt]; exists {
-            prev_LCA_ID := *(*uint16)(unsafe.Pointer(&kmer[8]))
-            lca := rg.ClassTree.getLCA(rg.ClassTree.NodesByID[prev_LCA_ID], relative)
+        if kmers, minExists := minToKmers[minInt]; minExists {
+            kmerExists := false
 
-            /*
-            prevLCA := rg.ClassTree.NodesByID[prev_LCA_ID]
-            if lca != rg.ClassTree.Root && !(strings.HasPrefix(prevLCA.Name, lca.Name) && strings.HasPrefix(relative.Name, lca.Name)) {
-                fmt.Println()
-                fmt.Println("prev LCA:", prevLCA.Name)
-                fmt.Println("relative:", relative.Name)
-                fmt.Println("new LCA:", lca.Name)
-                panic("fatal LCA error")
+            for i, kmer := range kmers {
+                // the case that we've already processed this exact kmer - we just update the LCA
+                if kmerInt == *(*KmerInt)(unsafe.Pointer(&kmer[0])) {
+                    kmerExists = true
+                    prev_LCA_ID := *(*uint16)(unsafe.Pointer(&kmer[8]))
+                    lca := rg.ClassTree.getLCA(rg.ClassTree.NodesByID[prev_LCA_ID], relative)
+                    /*
+                    prevLCA := rg.ClassTree.NodesByID[prev_LCA_ID]
+                    if lca != rg.ClassTree.Root && !(strings.HasPrefix(prevLCA.Name, lca.Name) && strings.HasPrefix(relative.Name, lca.Name)) {
+                        fmt.Println()
+                        fmt.Println("prev LCA:", prevLCA.Name)
+                        fmt.Println("relative:", relative.Name)
+                        fmt.Println("new LCA:", lca.Name)
+                        panic("fatal LCA error")
+                    }
+                    */
+
+                    *(*uint16)(unsafe.Pointer(&kmer[8])) = lca.ID
+                    minToKmers[minInt][i] = kmer
+
+                    break
+                }
             }
-            */
 
-            *(*uint16)(unsafe.Pointer(&kmer[8])) = lca.ID
-            kmerMap[kmerInt] = kmer
+            if !kmerExists {
+                var kmer Kmer
+                *(*KmerInt)(unsafe.Pointer(&kmer[0])) = kmerInt
+                *(*uint16)(unsafe.Pointer(&kmer[8])) = relative.ID
+                minToKmers[minInt] = append(minToKmers[minInt], kmer)
+            }
+
         // ...otherwise we initialize it in the kmerMap
         } else {
+            var kmer Kmer
             *(*KmerInt)(unsafe.Pointer(&kmer[0])) = kmerInt
             *(*uint16)(unsafe.Pointer(&kmer[8])) = relative.ID
-            kmerMap[kmerInt] = kmer
+            minToKmers[minInt] = Kmers{kmer}
         }
     }
     fmt.Println("...all kmers processed")
@@ -728,82 +741,56 @@ func (rg *RepeatGenome) getKrakenSlice() error {
         pprof.WriteHeapProfile(rg.memProfFile)
     }
 
-    return rg.populateKraken(minCache, kmerMap)
+    return rg.populateKraken(minToKmers)
 }
 
-func (rg *RepeatGenome) populateKraken(minCache MinCache, kmerMap map[KmerInt]Kmer) error {
-    if len(kmerMap) != len(minCache) {
-        panic("lengths of kmerMap and minCache are incompatible")
+func (rg *RepeatGenome) populateKraken(minToKmers map[MinInt]Kmers) error {
+    var numUniqKmers uint64 = 0
+    var sortedMins MinInts
+
+    for minInt, kmers := range minToKmers {
+        numUniqKmers += uint64(len(kmers))
+        sort.Sort(minToKmers[minInt])
+        sortedMins = append(sortedMins, minInt)
     }
-    numUniqKmers := uint64(len(kmerMap))
+    sort.Sort(sortedMins)
 
     fmt.Println(comma(numUniqKmers), "unique kmers generated")
 
-    minMap := make(MinMap)
-
-    for kmerInt, kmer := range kmerMap {
-        minimizer := minCache[kmerInt]
-
-        if kmers, exists := minMap[minimizer]; exists {
-            minMap[minimizer] = append(kmers, kmer)
-        } else {
-            minMap[minimizer] = Kmers{kmer}
+    for i := range sortedMins {
+        if i == 0 || sortedMins[i] != sortedMins[i-1] {
+            rg.SortedUniqMins = append(rg.SortedUniqMins, sortedMins[i])
         }
-        delete(kmerMap, kmerInt)
     }
 
-    var minMapCount uint64 = 0
-    for i := range minMap {
-        minMapCount += uint64(len(minMap[i]))
-    }
-    if minMapCount != numUniqKmers {
-        panic("error populated minMap - length not equal to that of kmerMap")
-    }
-
-    numUniqMins := uint64(len(minMap))
-    fmt.Println(comma(numUniqMins), "unique minimizers used")
-
-    // manual deletion to save memory
-    kmerMap = nil
+    // manual deletion and garbage collection
+    sortedMins = nil
     runtime.GC()
 
-    rg.MinCounts = make(map[MinInt]uint64, numUniqMins)
-    rg.SortedMins = make(MinInts, 0, numUniqMins)
-    for thisMin, kmers := range minMap {
-        if len(kmers) == 0 {
-            panic("empty kmer list stored in minMap")
-        }
-        rg.MinCounts[thisMin] += uint64(len(kmers))
-        rg.SortedMins = append(rg.SortedMins, thisMin)
-        sort.Sort(kmers)
-    }
-    sort.Sort(rg.SortedMins)
-
-    if uint64(len(rg.SortedMins)) != numUniqMins {
-        panic(fmt.Errorf("error populating RepeatGenome.SortedMins - %d minimizers inserted rather than expected %d", len(rg.SortedMins), numUniqMins))
-    }
-
-    if rg.Flags.WriteKraken {
-        err := rg.WriteMins(minMap)
-        if err != nil {
-            return err
-        }
-    }
+    numUniqMins := uint64(len(rg.SortedUniqMins))
+    fmt.Println(comma(numUniqMins), "unique minimizers used")
 
     var currOffset uint64 = 0
-    rg.OffsetsToMin = make(map[MinInt]uint64)
+    rg.OffsetsToMin = make([]uint64, 0, numUniqMins)
     rg.Kmers = make(Kmers, 0, numUniqKmers)
-    for _, thisMin := range rg.SortedMins {
-        rg.OffsetsToMin[thisMin] = currOffset
-        currOffset += uint64(len(minMap[thisMin]))
-        for _, kmer := range minMap[thisMin] {
+    for _, thisMin := range rg.SortedUniqMins {
+        rg.OffsetsToMin = append(rg.OffsetsToMin, currOffset)
+        currOffset += uint64(len(minToKmers[thisMin]))
+        for _, kmer := range minToKmers[thisMin] {
             rg.Kmers = append(rg.Kmers, kmer)
         }
-        delete(minMap, thisMin)
+        // delete(minMap, thisMin)     // useless because it's going to be almost immediately nilled anyway
     }
 
     if uint64(len(rg.Kmers)) != numUniqKmers {
         panic(fmt.Errorf("error populating RepeatGenome.Kmers - %d kmers inserted rather than expected %d", len(rg.Kmers), numUniqKmers))
+    }
+
+    if rg.Flags.WriteKraken {
+        err := rg.WriteMins()
+        if err != nil {
+            return err
+        }
     }
 
     if rg.Flags.MemProfile {
@@ -832,27 +819,48 @@ func (rg *RepeatGenome) numKmers() uint64 {
     return numKmers
 }
 
+func (rg *RepeatGenome) getMinIndex(minInt MinInt) (bool, uint64) {
+    var i uint64 = 0
+    j := uint64(len(rg.SortedUniqMins))
+
+    for i < j {
+        x := (i+j)/2
+
+        if minInt == rg.SortedUniqMins[x] {
+            return true, x
+        } else if minInt < rg.SortedUniqMins[x] {
+            j = x
+        } else {
+            i = x + 1
+        }
+    }
+
+    return false, 0
+}
+
 func (rg *RepeatGenome) getKmer(kmerInt KmerInt) *Kmer {
     minimizer := kmerInt.Minimize(rg.K, rg.M)
-    startInd, minExists := rg.OffsetsToMin[minimizer]
+    minExists, minIndex := rg.getMinIndex(minimizer)
     if !minExists {
         return nil
     }
+    startInd := rg.OffsetsToMin[minIndex]
     var endInd uint64
-    minCount, minExists := rg.MinCounts[minimizer]
-    if minExists {
-        endInd = startInd + minCount
+    if minIndex == uint64(len(rg.SortedUniqMins)) - 1 {
+        endInd = uint64(len(rg.Kmers))
     } else {
-        panic("minimizer exists in RepeatGenome.OffsetsToMin but not RepeatGenome.MinCounts")
+        endInd = rg.OffsetsToMin[minIndex+1]
     }
     
     if endInd > uint64(len(rg.Kmers)) {
         panic(fmt.Errorf("getKmer(): out-of-bounds RepeatGenome.Kmers access (len(rg.Kmers) = %d, endInd = %d)", len(rg.Kmers), endInd))
     }
 
+    /*
     if !sort.IsSorted(rg.Kmers[startInd:endInd]) {
         panic("minimizer's kmers not sorted")
     }
+    */
 
     // simple binary search within the range of RepeatGenome.Kmers that has this kmer's minimizer
     i, j := startInd, endInd

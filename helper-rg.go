@@ -224,3 +224,24 @@ func boolToInt(a bool) int {
         return 0
     }
 }
+
+// Takes as an argument the index of a minimizer in RepeatGenome.SortedUniqMins - NOT the minimizer's actual value.
+// Returns the indices of the minimizer's kmer range in RepeatGenome.Kmers
+func (rg *RepeatGenome) getMinIndices(minIndex uint64) (uint64, uint64) {
+    startInd := rg.OffsetsToMin[minIndex]
+    var endInd uint64
+    if minIndex == uint64(len(rg.SortedUniqMins)) - 1 {
+        endInd = uint64(len(rg.Kmers))
+    } else {
+        endInd = rg.OffsetsToMin[minIndex+1]
+    }
+    return startInd, endInd
+}
+
+// Takes as an argument the index of a minimizer in RepeatGenome.SortedUniqMins - NOT the minimizer's actual value.
+// Returns a slice of the kmers associated with that minimizer.
+// Intended for non-performance-critical sections, like file writing.
+func (rg *RepeatGenome) getMinsKmers(minIndex uint64) []Kmer {
+    startInd, endInd := rg.getMinIndices(minIndex)
+    return rg.Kmers[startInd : endInd]
+}

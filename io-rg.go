@@ -96,12 +96,8 @@ func (refGenome *RepeatGenome) PrintChromInfo() {
     }
 }
 
-func (repeatGenome *RepeatGenome) WriteMins(minMap MinMap) error {
-    k := repeatGenome.K
-    m := repeatGenome.M
-    kmerBuf := make(TextSeq, k, k)
-    minBuf := make(TextSeq, m, m)
-    filename := strings.Join([]string{repeatGenome.Name, ".mins"}, "")
+func (rg *RepeatGenome) WriteMins() error {
+    filename := strings.Join([]string{rg.Name, ".mins"}, "")
     outfile, err := os.Create(filename)
     if err != nil {
         return err
@@ -110,18 +106,20 @@ func (repeatGenome *RepeatGenome) WriteMins(minMap MinMap) error {
     writer := bufio.NewWriter(outfile)
     defer writer.Flush()
 
-    for thisMin, kmers := range minMap {
+    kmerBuf := make(TextSeq, rg.K, rg.K)
+    minBuf := make(TextSeq, rg.M, rg.M)
+
+    for i, thisMin := range rg.SortedUniqMins {
         fillMinBuf(minBuf, thisMin)
         _, err = fmt.Fprintf(writer, ">%s\n", minBuf)
         if err != nil {
             return err
         }
-
-        for i := range kmers {
-            kmerSeqInt := *(*KmerInt)(unsafe.Pointer(&kmers[i][0]))
-            lcaID := *(*uint16)(unsafe.Pointer(&kmers[i][8]))
+        for _, kmer := range rg.getMinsKmers(uint64(i)) {
+            kmerSeqInt := *(*KmerInt)(unsafe.Pointer(&kmer[0]))
+            lcaID := *(*uint16)(unsafe.Pointer(&kmer[8]))
             fillKmerBuf(kmerBuf, kmerSeqInt)
-            _, err = fmt.Fprintf(writer, "\t%s %s\n", kmerBuf, repeatGenome.ClassTree.NodesByID[lcaID].Name)
+            _, err = fmt.Fprintf(writer, "\t%s %s\n", kmerBuf, rg.ClassTree.NodesByID[lcaID].Name)
             if err != nil {
                 return err
             }
