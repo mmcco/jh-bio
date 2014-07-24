@@ -160,6 +160,22 @@ func minU64(a, b uint64) uint64 {
     }
 }
 
+func minMinInt(a, b MinInt) MinInt {
+    if a < b {
+        return a
+    } else {
+        return b
+    }
+}
+
+func minKmerInt(a, b KmerInt) KmerInt {
+    if a < b {
+        return a
+    } else {
+        return b
+    }
+}
+
 // needed for sort.Interface
 func (kmers PKmers) Len() int {
     return len(kmers)
@@ -189,19 +205,16 @@ func (kmers Kmers) Less(i, j int) bool {
     return iVal < jVal
 }
 
-// needed for sort.Interface
-type Uint64Slice []uint64
-
-func (uint64s Uint64Slice) Len() int {
-    return len(uint64s)
+func (minInts MinInts) Len() int {
+    return len(minInts)
 }
 
-func (uint64s Uint64Slice) Swap(i, j int) {
-    uint64s[i], uint64s[j] = uint64s[j], uint64s[i]
+func (minInts MinInts) Swap(i, j int) {
+    minInts[i], minInts[j] = minInts[j], minInts[i]
 }
 
-func (uint64s Uint64Slice) Less(i, j int) bool {
-    return uint64s[i] < uint64s[j]
+func (minInts MinInts) Less(i, j int) bool {
+    return minInts[i] < minInts[j]
 }
 
 func boolToInt(a bool) int {

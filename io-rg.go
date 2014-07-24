@@ -111,14 +111,14 @@ func (repeatGenome *RepeatGenome) WriteMins(minMap MinMap) error {
     defer writer.Flush()
 
     for thisMin, kmers := range minMap {
-        fillKmerBuf(minBuf, thisMin)
+        fillMinBuf(minBuf, thisMin)
         _, err = fmt.Fprintf(writer, ">%s\n", minBuf)
         if err != nil {
             return err
         }
 
         for i := range kmers {
-            kmerSeqInt := *(*uint64)(unsafe.Pointer(&kmers[i][0]))
+            kmerSeqInt := *(*KmerInt)(unsafe.Pointer(&kmers[i][0]))
             lcaID := *(*uint16)(unsafe.Pointer(&kmers[i][8]))
             fillKmerBuf(kmerBuf, kmerSeqInt)
             _, err = fmt.Fprintf(writer, "\t%s %s\n", kmerBuf, repeatGenome.ClassTree.NodesByID[lcaID].Name)
@@ -130,11 +130,14 @@ func (repeatGenome *RepeatGenome) WriteMins(minMap MinMap) error {
     return nil
 }
 
-func printSeqInt(seqInt uint64, seqLen uint8) {
+func (kmerInt KmerInt) print(seqLen uint8) {
+    if seqLen > 31 {
+        panic("seqLen passed to printKmerInt() was too large")
+    }
     var i uint8
     for i = 0; i < seqLen; i++ {
         // this tricky bit arithmetic shifts the two bits of interests to the two rightmost positions, then selects them with the and statement
-        switch (seqInt >> (2 * (seqLen - i - 1))) & 3 {
+        switch (kmerInt >> (2 * (seqLen - i - 1))) & 3 {
         case 0:
             fmt.Print("a")
             break
@@ -153,7 +156,67 @@ func printSeqInt(seqInt uint64, seqLen uint8) {
     }
 }
 
-func writeSeqInt(writer io.ByteWriter, seqInt uint64, seqLen uint8) error {
+func (minInt MinInt) print(seqLen uint8) {
+    if seqLen > 15 {
+        panic("seqLen passed to printMinInt() was too large")
+    }
+    var i uint8
+    for i = 0; i < seqLen; i++ {
+        // this tricky bit arithmetic shifts the two bits of interests to the two rightmost positions, then selects them with the and statement
+        switch (minInt >> (2 * (seqLen - i - 1))) & 3 {
+        case 0:
+            fmt.Print("a")
+            break
+        case 1:
+            fmt.Print("c")
+            break
+        case 2:
+            fmt.Print("g")
+            break
+        case 3:
+            fmt.Print("t")
+            break
+        default:
+            panic("error in printSeqInt() base selection")
+        }
+    }
+}
+
+func writeKmerInt(writer io.ByteWriter, seqInt KmerInt, seqLen uint8) error {
+    if seqLen > 31 {
+        panic("seqLen passed to writeKmerInt() was too large")
+    }
+    var i uint8
+    var err error
+    for i = 0; i < seqLen; i++ {
+        // this tricky bit arithmetic shifts the two bits of interests to the two rightmost positions, then selects them with the and statement
+        switch (seqInt >> (2 * (seqLen - i - 1))) & 3 {
+        case 0:
+            err = writer.WriteByte('a')
+            break
+        case 1:
+            err = writer.WriteByte('c')
+            break
+        case 2:
+            err = writer.WriteByte('g')
+            break
+        case 3:
+            err = writer.WriteByte('t')
+            break
+        default:
+            err = fmt.Errorf("error in printSeqInt() base selection")
+        }
+        if err != nil {
+            return IOError{"repeatgenome.writeSeqInt()", err}
+        }
+    }
+    return nil
+}
+
+func writeMinInt(writer io.ByteWriter, seqInt MinInt, seqLen uint8) error {
+    if seqLen > 15 {
+        panic("seqLen passed to writeMinInt() was too large")
+    }
     var i uint8
     var err error
     for i = 0; i < seqLen; i++ {
@@ -183,9 +246,9 @@ func writeSeqInt(writer io.ByteWriter, seqInt uint64, seqLen uint8) error {
 
 // assumes that all bytes in the slice to be filled are initialized
 // (a.k.a initialize buffer with make(TextSeq, k, k))
-func fillKmerBuf(slice TextSeq, seqInt uint64) {
-    if len(slice) > 32 {
-        panic("slice of length greater than 32 passed to fillKmerBuf()")
+func fillKmerBuf(slice TextSeq, seqInt KmerInt) {
+    if len(slice) > 31 {
+        panic("slice of length greater than 31 passed to fillKmerBuf()")
     }
     for i := range slice {
         switch (seqInt >> uint((2 * (len(slice) - i - 1)))) & 3 {
@@ -202,7 +265,31 @@ func fillKmerBuf(slice TextSeq, seqInt uint64) {
             slice[i] = byte('t')
             break
         default:
-            panic("error in printSeqInt() base selection")
+            panic("error in fillKmerBuf() base selection")
+        }
+    }
+}
+
+func fillMinBuf(slice TextSeq, seqInt MinInt) {
+    if len(slice) > 15 {
+        panic("slice of length greater than 15 passed to fillMinBuf()")
+    }
+    for i := range slice {
+        switch (seqInt >> uint((2 * (len(slice) - i - 1)))) & 3 {
+        case 0:
+            slice[i] = byte('a')
+            break
+        case 1:
+            slice[i] = byte('c')
+            break
+        case 2:
+            slice[i] = byte('g')
+            break
+        case 3:
+            slice[i] = byte('t')
+            break
+        default:
+            panic("error in fillMinBuf() base selection")
         }
     }
 }
@@ -318,7 +405,7 @@ func readSimSeqReads(filepath string) (error, Seqs) {
 
     simReads := make(Seqs, 0, len(lines))
     for _, line := range lines {
-        simReads = append(simReads, GetSeq(line))
+        simReads = append(simReads, TextSeq(line).Seq())
     }
     return nil, simReads
 }

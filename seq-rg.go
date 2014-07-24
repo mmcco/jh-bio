@@ -5,68 +5,124 @@ import (
 )
 // General sequence-manipulation functions.
 
-func seqToInt(seq TextSeq) uint64 {
+func (seq TextSeq) kmerInt() KmerInt {
     if len(seq) < 1 || len(seq) > 31 {
-        panic("seqToInt() can only int-ize sequences where 0 < length < 32")
+        panic("TextSeq.kmerInt() can only int-ize sequences where 0 < length < 32")
     }
-    var seqInt uint64 = 0
+    var kmerInt KmerInt = 0
     for _, c := range seq {
-        seqInt = seqInt << 2
+        kmerInt = kmerInt << 2
         switch c {
         case 'a':
             break
         case 'c':
-            seqInt |= 1
+            kmerInt |= 1
             break
         case 'g':
-            seqInt |= 2
+            kmerInt |= 2
             break
         case 't':
-            seqInt |= 3
+            kmerInt |= 3
             break
         default:
-            panic(fmt.Errorf("byte other than 'a', 'c', 'g', or 't' passed to seqToInt(): %c", c))
+            panic(fmt.Errorf("byte other than 'a', 'c', 'g', or 't' passed to TextSeq.kmerInt(): %c", c))
         }
     }
-    return seqInt
+    return kmerInt
 }
 
-func revCompToInt(seq TextSeq) uint64 {
-    if len(seq) < 1 || len(seq) > 31 {
-        panic("revCompToInt() can only int-ize sequences where 0 < length < 32")
+func (seq TextSeq) minInt() MinInt {
+    if len(seq) < 1 || len(seq) > 15 {
+        panic("TextSeq.minInt() can only int-ize sequences where 0 < length < 32")
     }
-    var seqInt uint64 = 0
-    for i := range seq {
-        seqInt = seqInt << 2
-        switch seq[len(seq)-(i+1)] {
+    var minInt MinInt = 0
+    for _, c := range seq {
+        minInt = minInt << 2
+        switch c {
         case 'a':
-            seqInt |= 3
             break
         case 'c':
-            seqInt |= 2
+            minInt |= 1
             break
         case 'g':
-            seqInt |= 1
+            minInt |= 2
+            break
+        case 't':
+            minInt |= 3
+            break
+        default:
+            panic(fmt.Errorf("byte other than 'a', 'c', 'g', or 't' passed to TextSeq.minInt(): %c", c))
+        }
+    }
+    return minInt
+}
+
+func (seq TextSeq) revCompKmerInt() KmerInt {
+    if len(seq) < 1 || len(seq) > 31 {
+        panic("TextSeq.revCompKmerInt() can only int-ize sequences where 0 < length < 32")
+    }
+    var kmerInt KmerInt = 0
+    for i := range seq {
+        kmerInt = kmerInt << 2
+        switch seq[len(seq)-(i+1)] {
+        case 'a':
+            kmerInt |= 3
+            break
+        case 'c':
+            kmerInt |= 2
+            break
+        case 'g':
+            kmerInt |= 1
             break
         case 't':
             break
         default:
-            panic(fmt.Errorf("byte other than 'a', 'c', 'g', or 't' passed to revCompToInt(): %c", seq[i]))
+            panic(fmt.Errorf("byte other than 'a', 'c', 'g', or 't' passed to TextSeq.revCompKmerInt(): %c", seq[i]))
         }
     }
-    return seqInt
+    return kmerInt
 }
 
-func intRevComp(posInt uint64, seqLen uint8) uint64 {
-    var revComp uint64 = 0
+func (seq TextSeq) revCompMinInt() MinInt {
+    if len(seq) < 1 || len(seq) > 15 {
+        panic("TextSeq.revCompMinInt() can only int-ize sequences where 0 < length < 15")
+    }
+    var minInt MinInt = 0
+    for i := range seq {
+        minInt = minInt << 2
+        switch seq[len(seq)-(i+1)] {
+        case 'a':
+            minInt |= 3
+            break
+        case 'c':
+            minInt |= 2
+            break
+        case 'g':
+            minInt |= 1
+            break
+        case 't':
+            break
+        default:
+            panic(fmt.Errorf("byte other than 'a', 'c', 'g', or 't' passed to TextSeq.revCompMinInt(): %c", seq[i]))
+        }
+    }
+    return minInt
+}
+
+func (kmerInt KmerInt) revComp(seqLen uint8) KmerInt {
+    if seqLen > 31 {
+        panic("seqLen provided to KmerInt.revComp too large")
+    }
+
+    var revComp KmerInt = 0
     var i uint8
     for i = 0; i < seqLen; i++ {
         // should execute before every loop but the first
         if i != 0 {
             revComp <<= 2
-            posInt >>= 2
+            kmerInt >>= 2
         }
-        switch posInt & 3 {
+        switch kmerInt & 3 {
         case 0:
             revComp |= 3
             break
@@ -79,50 +135,73 @@ func intRevComp(posInt uint64, seqLen uint8) uint64 {
         case 3:
             break
         default:
-            panic("bit manipulation logic error in intRevComp()")
+            panic("bit manipulation logic error in KmerInt.revComp()")
         }
     }
     return revComp
 }
 
-func getMinimizer(kmer uint64, k, m uint8) (uint8, uint64) {
+func (minInt MinInt) revComp(seqLen uint8) MinInt {
+    if seqLen > 15 {
+        panic("seqLen provided to MinInt.revComp too large")
+    }
+
+    var revComp MinInt = 0
+    var i uint8
+    for i = 0; i < seqLen; i++ {
+        // should execute before every loop but the first
+        if i != 0 {
+            revComp <<= 2
+            minInt >>= 2
+        }
+        switch minInt & 3 {
+        case 0:
+            revComp |= 3
+            break
+        case 1:
+            revComp |= 2
+            break
+        case 2:
+            revComp |= 1
+            break
+        case 3:
+            break
+        default:
+            panic("bit manipulation logic error in KmerInt.revComp()")
+        }
+    }
+    return revComp
+}
+
+func (kmerInt KmerInt) Minimize(k, m uint8) MinInt {
     if m > k || m < 1 {
-        panic("getMinimizer(): m must be <= k and > 0")
+        panic("KmerInt.Minimize(): m must be <= k and > 0")
     }
 
     // stores the index of the leftmost base included in the minimizer
-    var currOffset uint8 = 0
     numExtraBases := 32 - k
-    revCompKmer := intRevComp(kmer, k)
-    currMin := kmer >> uint64(64-2*(32-k+m))
-    possMin := currMin
     numHangingBases := k - m
-    var i uint8
+    // despite being minimizers (and therefore expected to be MinInts), we make possMin and currMin KmerInts for ease of manipulation and then convert upon returning
+    // initialize the current best minimizer candidate as MAX_INT
+    currMin := ^KmerInt(0)
     // i is the index of the offset
+    var i uint8
     for i = 0; i <= numHangingBases; i++ {
         // overflow off the first excluded base
-        possMin = kmer << (2 * (numExtraBases + i))
+        possMin := kmerInt << (2 * (numExtraBases + i))
         // return to proper alignment
         possMin >>= 64 - 2*m
+        possMin = minKmerInt(possMin, possMin.revComp(m))
 
         if possMin < currMin {
             currMin = possMin
-            currOffset = i
-        }
-
-        possMin = revCompKmer << (2 * (numExtraBases + i))
-        possMin >>= 64 - 2*m
-
-        if possMin < currMin {
-            currMin = possMin
-            currOffset = numHangingBases - i
         }
     }
 
-    return currOffset, currMin
+    return MinInt(currMin)
 }
 
-func revComp(seq TextSeq) TextSeq {
+func (seq TextSeq) revComp() TextSeq {
     var revCompSeq = make(TextSeq, 0, len(seq))
     for i := range seq {
         switch seq[len(seq)-i-1] {
@@ -147,7 +226,8 @@ func revComp(seq TextSeq) TextSeq {
 
 // The logic for determining the minimizer
 // Currently, it uses simple lexicographic ordering
-func seqLessThan(a, b TextSeq) bool {
+// The function's name allows it to be used in a sort.Interface implementation, if we ever need one.
+func (a TextSeq) Less(b TextSeq) bool {
     // min function manually inlined for speed - dubious
     var size int
     if len(a) < len(b) {
@@ -166,7 +246,7 @@ func seqLessThan(a, b TextSeq) bool {
     return false
 }
 
-func GetSeq(seqStr TextSeq) Seq {
+func (seqStr TextSeq) Seq() Seq {
     // ceiling division of len(seqStr) by 4
     var numBytes uint64 = 1 + ((uint64(len(seqStr)) - 1) / 4)
     seq := Seq{make([]byte, numBytes, numBytes), uint64(len(seqStr))}
@@ -190,7 +270,7 @@ func GetSeq(seqStr TextSeq) Seq {
             seq.Bases[0] |= 3
             break
         default:
-            panic("byte other than 'a', 'c', 'g', or 't' supplied to revComp")
+            panic("byte other than 'a', 'c', 'g', or 't' supplied to TextSeq.Seq()")
         }
 
         seqStrInd++
