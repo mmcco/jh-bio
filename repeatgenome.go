@@ -165,11 +165,6 @@ type MuxKmers struct {
     Kmers Kmers
 }
 
-type MuxMinToKmers struct {
-    sync.RWMutex
-    m map[MinInt]*MuxKmers
-}
-
 // Used to differentiate sequence representations with one base per byte (type TextSeq) from those with four bases per byte (type Seq).
 type TextSeq []byte
 
@@ -665,65 +660,41 @@ func (rg *RepeatGenome) minimizeThread(matchStart, matchEnd uint64, c chan Threa
     close(c)
 }
 
-func (rg *RepeatGenome) krakenUpdateThread(minToKmers MuxMinToKmers, respChan <-chan ThreadResponse, wg sync.WaitGroup) {
-    for resp := range respChan {
-        kmerInt, minInt, relative := resp.KmerInt, resp.MinInt, resp.Relative
-        
-        minToKmers.RLock()
-        fmt.Println(minToKmers.m[minInt])
-        if muxKmers, minExists := minToKmers.m[minInt]; minExists {
-            minToKmers.RUnlock();
-            muxKmers.Lock()
-            kmers := muxKmers.Kmers
-            kmerExists := false
+type UpdateInfo struct {
+    muxKmers *MuxKmers
+    kmerInt KmerInt
+    relative *ClassNode
+}
 
-            for i, kmer := range kmers {
-                // the case that we've already processed this exact kmer - we just update the LCA
-                if kmerInt == *(*KmerInt)(unsafe.Pointer(&kmer[0])) {
-                    kmerExists = true
-                    prev_LCA_ID := *(*uint16)(unsafe.Pointer(&kmer[8]))
-                    lca := rg.ClassTree.getLCA(rg.ClassTree.NodesByID[prev_LCA_ID], relative)
-                    /*
-                    prevLCA := rg.ClassTree.NodesByID[prev_LCA_ID]
-                    if lca != rg.ClassTree.Root && !(strings.HasPrefix(prevLCA.Name, lca.Name) && strings.HasPrefix(relative.Name, lca.Name)) {
-                        fmt.Println()
-                        fmt.Println("prev LCA:", prevLCA.Name)
-                        fmt.Println("relative:", relative.Name)
-                        fmt.Println("new LCA:", lca.Name)
-                        panic("fatal LCA error")
-                    }
-                    */
+func (rg *RepeatGenome) krakenUpdateThread(wg *sync.WaitGroup, updateChan chan UpdateInfo) {
+    for updateInfo := range updateChan {
+        muxKmers, kmerInt, relative := updateInfo.muxKmers, updateInfo.kmerInt, updateInfo.relative
+        muxKmers.Lock()
+        kmerExists := false
 
-                    *(*uint16)(unsafe.Pointer(&kmer[8])) = lca.ID
-                    kmers[i] = kmer
+        for i, kmer := range muxKmers.Kmers {
+            // the case that we've already processed this exact kmer - we just update the LCA
+            if kmerInt == *(*KmerInt)(unsafe.Pointer(&kmer[0])) {
+                kmerExists = true
+                prev_LCA_ID := *(*uint16)(unsafe.Pointer(&kmer[8]))
+                lca := rg.ClassTree.getLCA(rg.ClassTree.NodesByID[prev_LCA_ID], relative)
 
-                    break
-                }
+                *(*uint16)(unsafe.Pointer(&kmer[8])) = lca.ID
+                muxKmers.Kmers[i] = kmer
+
+                break
             }
+        }
 
-            if !kmerExists {
-                var kmer Kmer
-                *(*KmerInt)(unsafe.Pointer(&kmer[0])) = kmerInt
-                *(*uint16)(unsafe.Pointer(&kmer[8])) = relative.ID
-                kmers = append(kmers, kmer)
-            }
-
-            muxKmers.Unlock()
-
-        // ...otherwise we initialize it in the kmerMap
-        } else {
-            minToKmers.RUnlock();
+        if !kmerExists {
             var kmer Kmer
             *(*KmerInt)(unsafe.Pointer(&kmer[0])) = kmerInt
             *(*uint16)(unsafe.Pointer(&kmer[8])) = relative.ID
-            // we don't need to lock because the update is atomic with the addition
-            minToKmers.Lock()
-            minToKmers.m[minInt] = &MuxKmers{ sync.Mutex{}, Kmers{kmer} }
-            minToKmers.Unlock()
+            muxKmers.Kmers = append(muxKmers.Kmers, kmer)
         }
+        muxKmers.Unlock()
+        wg.Done()
     }
-
-    wg.Done()
 }
 
 func (rg *RepeatGenome) getKrakenSlice() error {
@@ -749,34 +720,43 @@ func (rg *RepeatGenome) getKrakenSlice() error {
         go rg.minimizeThread(mStart, mEnd, c)
     }
 
+    minToKmers := make(map[MinInt]*MuxKmers)
     numUpdateThreads := numCPU / 2
+    updateChan := make(chan UpdateInfo, 1000)
     var wg sync.WaitGroup
-    var minToKmers MuxMinToKmers
-    minToKmers.m = make(map[MinInt]*MuxKmers)
-    masterRespChan := mergeThreadResp(threadChans)
     for i := 0; i < numUpdateThreads; i++ {
-        go rg.krakenUpdateThread(minToKmers, masterRespChan, wg)
-        wg.Add(1)
+        go rg.krakenUpdateThread(&wg, updateChan)
     }
+    
+    var kmersProcessed uint64 = 0
 
-    wg.Wait()
-    fmt.Println()
-    fmt.Println("finished!")
-    os.Exit(0)
-    /*
     // below is the atomic section of minimizing
     // this seems to be the rate-limiting section, as 24+ goroutines use only ~9-10 CPU-equivalents
     // it should therefore be optimized first
-    var kmersProcessed uint64 = 0
-
-    for response := range  {
+    for resp := range mergeThreadResp(threadChans) {
         if kmersProcessed%5000000 == 0 {
             fmt.Println(comma(kmersProcessed/1000000), "million kmers processed...")
         }
         kmersProcessed++
 
+        kmerInt, minInt, relative := resp.KmerInt, resp.MinInt, resp.Relative
+        
+        if muxKmers, minExists := minToKmers[minInt]; minExists {
+            wg.Add(1)
+            updateChan <- UpdateInfo{muxKmers, kmerInt, relative}
+        // ...otherwise we initialize it in the kmerMap
+        } else {
+            var kmer Kmer
+            *(*KmerInt)(unsafe.Pointer(&kmer[0])) = kmerInt
+            *(*uint16)(unsafe.Pointer(&kmer[8])) = relative.ID
+            // we don't need to lock because the update is atomic with the addition
+            minToKmers[minInt] = &MuxKmers{ sync.Mutex{}, Kmers{kmer} }
+        }
     }
-    */
+
+    wg.Wait()
+    close(updateChan)
+
     fmt.Println("...all kmers processed")
     fmt.Println()
 
@@ -787,13 +767,13 @@ func (rg *RepeatGenome) getKrakenSlice() error {
     return rg.populateKraken(minToKmers)
 }
 
-func (rg *RepeatGenome) populateKraken(minToKmers MuxMinToKmers) error {
+func (rg *RepeatGenome) populateKraken(minToKmers map[MinInt]*MuxKmers) error {
     var numUniqKmers uint64 = 0
 
-    for minInt, muxKmers := range minToKmers.m {
+    for minInt, muxKmers := range minToKmers {
         kmers := muxKmers.Kmers
         numUniqKmers += uint64(len(kmers))
-        sort.Sort(minToKmers.m[minInt].Kmers)
+        sort.Sort(kmers)
         rg.SortedMins = append(rg.SortedMins, minInt)
     }
     sort.Sort(rg.SortedMins)
@@ -808,8 +788,8 @@ func (rg *RepeatGenome) populateKraken(minToKmers MuxMinToKmers) error {
     rg.Kmers = make(Kmers, 0, numUniqKmers)
     for _, thisMin := range rg.SortedMins {
         rg.OffsetsToMin = append(rg.OffsetsToMin, currOffset)
-        currOffset += uint64(len(minToKmers.m[thisMin].Kmers))
-        for _, kmer := range minToKmers.m[thisMin].Kmers {
+        currOffset += uint64(len(minToKmers[thisMin].Kmers))
+        for _, kmer := range minToKmers[thisMin].Kmers {
             rg.Kmers = append(rg.Kmers, kmer)
         }
         // delete(minMap, thisMin)     // useless because it's going to be almost immediately nilled anyway
