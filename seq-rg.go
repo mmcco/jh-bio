@@ -302,3 +302,45 @@ func (seqStr TextSeq) Seq() Seq {
 
     return seq
 }
+
+func (seq Seq) subseq(start, end uint64) Seq {
+    subSeqLen := end - start
+    if subSeqLen > seq.Len {
+        panic("Seq.subseq(): subsequence larger than parent sequence requested")
+    }
+    // the actual number of bytes needed in Seq.Seq, calculated with ceiling division
+    numBytes := ((2*subSeqLen - 1) / 8) + 1
+    subSeq := Seq{make([]byte, numBytes, numBytes), subSeqLen}
+
+    //seqExtraBits := seq.numExtraBits()
+    subSeqExtraBits := subSeq.numExtraBits()
+    // the byte offset (floored, as there is likely a bit offset) of the subseq into seq
+    //byteOffset := (seq.Len - subSeqLen) / 4
+    //var bitOffset uint8 = seqExtraBits - subSeqExtraBits
+
+    var i uint64
+    for i = 0; i < subSeqLen; i++ {
+        byteIndex := (i*2 + uint64(subSeqExtraBits)) / 8
+        subSeq.Bases[byteIndex] <<= 2
+        // this method call is probably a performance drag
+        subSeq.Bases[byteIndex] |= seq.getBase(i + start)
+    }
+    
+    return subSeq
+}
+
+func (seq Seq) numExtraBits() uint8 {
+    return uint8(8 * uint64(len(seq.Bases)) - 2 * seq.Len)
+}
+
+func (seq Seq) getBase(i uint64) uint8 {
+    // the bit offset of this base in seq.Seq
+    bitOffset := i*2 + uint64(seq.numExtraBits())
+    // the byte index of seq.Seq in which our base exists
+    byteIndex := bitOffset / 8
+    var base uint8 = seq.Bases[byteIndex]
+    // the number of bits that must be shifted to move the base of interest into the least significant bits
+    bitsToShift := 6 - (bitOffset - 8*byteIndex)
+
+    return (base >> bitsToShift) | 3
+}

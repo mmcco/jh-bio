@@ -138,10 +138,10 @@ type RepeatGenome struct {
     K              uint8
     M              uint8
     Kmers          Kmers
-    // stores the offset of each minimizer's first kmer in RepeatGenome.Kmers - indexed by the minimizer's index in SortedUniqMins
+    // stores the offset of each minimizer's first kmer in RepeatGenome.Kmers - indexed by the minimizer's index in SortedMins
     OffsetsToMin   []uint64
     // stores the number of kmers that each minimizer is associated with
-    SortedUniqMins MinInts
+    SortedMins MinInts
     Matches        Matches
     ClassTree      ClassTree
     Repeats        Repeats
@@ -158,6 +158,16 @@ type ClassTree struct {
     // a pointer to the the class tree's root, used for recursive descent etc.
     // we explicitly create the root (because RepeatMatcher doesn't)
     Root *ClassNode
+}
+
+type MuxKmers struct {
+    sync.Mutex
+    Kmers Kmers
+}
+
+type MuxMinToKmers struct {
+    sync.RWMutex
+    m map[MinInt]*MuxKmers
 }
 
 // Used to differentiate sequence representations with one base per byte (type TextSeq) from those with four bases per byte (type Seq).
@@ -655,44 +665,16 @@ func (rg *RepeatGenome) minimizeThread(matchStart, matchEnd uint64, c chan Threa
     close(c)
 }
 
-func (rg *RepeatGenome) getKrakenSlice() error {
-    // a rudimentary way of deciding how many threads to allow, should eventually be improved
-    numCPU := runtime.NumCPU()
-    if rg.Flags.Debug {
-        fmt.Printf("getKrakenSlice() using %d CPUs\n", numCPU)
-    }
-    runtime.GOMAXPROCS(numCPU)
-    var mStart, mEnd uint64
-
-    if rg.Flags.Debug {
-        numKmers := rg.numKmers()
-        fmt.Printf("expecting >= %d million kmers\n", numKmers/1000000)
-    }
-
-    var threadChans [](chan ThreadResponse)
-    for i := 0; i < numCPU; i++ {
-        mStart = uint64(i * len(rg.Matches) / numCPU)
-        mEnd = uint64((i + 1) * len(rg.Matches) / numCPU)
-        c := make(chan ThreadResponse, 1000)
-        threadChans = append(threadChans, c)
-        go rg.minimizeThread(mStart, mEnd, c)
-    }
-
-    // below is the atomic section of minimizing
-    // this seems to be the rate-limiting section, as 24+ goroutines use only ~9-10 CPU-equivalents
-    // it should therefore be optimized first
-    minToKmers := make(map[MinInt]Kmers)
-    var kmersProcessed uint64 = 0
-
-    for response := range mergeThreadResp(threadChans) {
-        if kmersProcessed%5000000 == 0 {
-            fmt.Println(comma(kmersProcessed/1000000), "million kmers processed...")
-        }
-        kmersProcessed++
-
-        kmerInt, minInt, relative := response.KmerInt, response.MinInt, response.Relative
+func (rg *RepeatGenome) krakenUpdateThread(minToKmers MuxMinToKmers, respChan <-chan ThreadResponse, wg sync.WaitGroup) {
+    for resp := range respChan {
+        kmerInt, minInt, relative := resp.KmerInt, resp.MinInt, resp.Relative
         
-        if kmers, minExists := minToKmers[minInt]; minExists {
+        minToKmers.RLock()
+        fmt.Println(minToKmers.m[minInt])
+        if muxKmers, minExists := minToKmers.m[minInt]; minExists {
+            minToKmers.RUnlock();
+            muxKmers.Lock()
+            kmers := muxKmers.Kmers
             kmerExists := false
 
             for i, kmer := range kmers {
@@ -713,7 +695,7 @@ func (rg *RepeatGenome) getKrakenSlice() error {
                     */
 
                     *(*uint16)(unsafe.Pointer(&kmer[8])) = lca.ID
-                    minToKmers[minInt][i] = kmer
+                    kmers[i] = kmer
 
                     break
                 }
@@ -723,17 +705,78 @@ func (rg *RepeatGenome) getKrakenSlice() error {
                 var kmer Kmer
                 *(*KmerInt)(unsafe.Pointer(&kmer[0])) = kmerInt
                 *(*uint16)(unsafe.Pointer(&kmer[8])) = relative.ID
-                minToKmers[minInt] = append(minToKmers[minInt], kmer)
+                kmers = append(kmers, kmer)
             }
+
+            muxKmers.Unlock()
 
         // ...otherwise we initialize it in the kmerMap
         } else {
+            minToKmers.RUnlock();
             var kmer Kmer
             *(*KmerInt)(unsafe.Pointer(&kmer[0])) = kmerInt
             *(*uint16)(unsafe.Pointer(&kmer[8])) = relative.ID
-            minToKmers[minInt] = Kmers{kmer}
+            // we don't need to lock because the update is atomic with the addition
+            minToKmers.Lock()
+            minToKmers.m[minInt] = &MuxKmers{ sync.Mutex{}, Kmers{kmer} }
+            minToKmers.Unlock()
         }
     }
+
+    wg.Done()
+}
+
+func (rg *RepeatGenome) getKrakenSlice() error {
+    // a rudimentary way of deciding how many threads to allow, should eventually be improved
+    numCPU := runtime.NumCPU()
+    if rg.Flags.Debug {
+        fmt.Printf("getKrakenSlice() using %d CPUs\n", ceilDiv(numCPU, 2))
+    }
+    runtime.GOMAXPROCS(numCPU)
+    var mStart, mEnd uint64
+
+    if rg.Flags.Debug {
+        numKmers := rg.numKmers()
+        fmt.Printf("expecting >= %d million kmers\n", numKmers/1000000)
+    }
+
+    var threadChans [](chan ThreadResponse)
+    for i := 0; i < numCPU; i++ {
+        mStart = uint64(i * len(rg.Matches) / numCPU)
+        mEnd = uint64((i + 1) * len(rg.Matches) / numCPU)
+        c := make(chan ThreadResponse, 1000)
+        threadChans = append(threadChans, c)
+        go rg.minimizeThread(mStart, mEnd, c)
+    }
+
+    numUpdateThreads := numCPU / 2
+    var wg sync.WaitGroup
+    var minToKmers MuxMinToKmers
+    minToKmers.m = make(map[MinInt]*MuxKmers)
+    masterRespChan := mergeThreadResp(threadChans)
+    for i := 0; i < numUpdateThreads; i++ {
+        go rg.krakenUpdateThread(minToKmers, masterRespChan, wg)
+        wg.Add(1)
+    }
+
+    wg.Wait()
+    fmt.Println()
+    fmt.Println("finished!")
+    os.Exit(0)
+    /*
+    // below is the atomic section of minimizing
+    // this seems to be the rate-limiting section, as 24+ goroutines use only ~9-10 CPU-equivalents
+    // it should therefore be optimized first
+    var kmersProcessed uint64 = 0
+
+    for response := range  {
+        if kmersProcessed%5000000 == 0 {
+            fmt.Println(comma(kmersProcessed/1000000), "million kmers processed...")
+        }
+        kmersProcessed++
+
+    }
+    */
     fmt.Println("...all kmers processed")
     fmt.Println()
 
@@ -744,39 +787,29 @@ func (rg *RepeatGenome) getKrakenSlice() error {
     return rg.populateKraken(minToKmers)
 }
 
-func (rg *RepeatGenome) populateKraken(minToKmers map[MinInt]Kmers) error {
+func (rg *RepeatGenome) populateKraken(minToKmers MuxMinToKmers) error {
     var numUniqKmers uint64 = 0
-    var sortedMins MinInts
 
-    for minInt, kmers := range minToKmers {
+    for minInt, muxKmers := range minToKmers.m {
+        kmers := muxKmers.Kmers
         numUniqKmers += uint64(len(kmers))
-        sort.Sort(minToKmers[minInt])
-        sortedMins = append(sortedMins, minInt)
+        sort.Sort(minToKmers.m[minInt].Kmers)
+        rg.SortedMins = append(rg.SortedMins, minInt)
     }
-    sort.Sort(sortedMins)
+    sort.Sort(rg.SortedMins)
 
     fmt.Println(comma(numUniqKmers), "unique kmers generated")
 
-    for i := range sortedMins {
-        if i == 0 || sortedMins[i] != sortedMins[i-1] {
-            rg.SortedUniqMins = append(rg.SortedUniqMins, sortedMins[i])
-        }
-    }
-
-    // manual deletion and garbage collection
-    sortedMins = nil
-    runtime.GC()
-
-    numUniqMins := uint64(len(rg.SortedUniqMins))
+    numUniqMins := uint64(len(rg.SortedMins))
     fmt.Println(comma(numUniqMins), "unique minimizers used")
 
     var currOffset uint64 = 0
     rg.OffsetsToMin = make([]uint64, 0, numUniqMins)
     rg.Kmers = make(Kmers, 0, numUniqKmers)
-    for _, thisMin := range rg.SortedUniqMins {
+    for _, thisMin := range rg.SortedMins {
         rg.OffsetsToMin = append(rg.OffsetsToMin, currOffset)
-        currOffset += uint64(len(minToKmers[thisMin]))
-        for _, kmer := range minToKmers[thisMin] {
+        currOffset += uint64(len(minToKmers.m[thisMin].Kmers))
+        for _, kmer := range minToKmers.m[thisMin].Kmers {
             rg.Kmers = append(rg.Kmers, kmer)
         }
         // delete(minMap, thisMin)     // useless because it's going to be almost immediately nilled anyway
@@ -821,14 +854,14 @@ func (rg *RepeatGenome) numKmers() uint64 {
 
 func (rg *RepeatGenome) getMinIndex(minInt MinInt) (bool, uint64) {
     var i uint64 = 0
-    j := uint64(len(rg.SortedUniqMins))
+    j := uint64(len(rg.SortedMins))
 
     for i < j {
         x := (i+j)/2
 
-        if minInt == rg.SortedUniqMins[x] {
+        if minInt == rg.SortedMins[x] {
             return true, x
-        } else if minInt < rg.SortedUniqMins[x] {
+        } else if minInt < rg.SortedMins[x] {
             j = x
         } else {
             i = x + 1
@@ -846,7 +879,7 @@ func (rg *RepeatGenome) getKmer(kmerInt KmerInt) *Kmer {
     }
     startInd := rg.OffsetsToMin[minIndex]
     var endInd uint64
-    if minIndex == uint64(len(rg.SortedUniqMins)) - 1 {
+    if minIndex == uint64(len(rg.SortedMins)) - 1 {
         endInd = uint64(len(rg.Kmers))
     } else {
         endInd = rg.OffsetsToMin[minIndex+1]

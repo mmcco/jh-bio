@@ -109,7 +109,7 @@ func (rg *RepeatGenome) WriteMins() error {
     kmerBuf := make(TextSeq, rg.K, rg.K)
     minBuf := make(TextSeq, rg.M, rg.M)
 
-    for i, thisMin := range rg.SortedUniqMins {
+    for i, thisMin := range rg.SortedMins {
         fillMinBuf(minBuf, thisMin)
         _, err = fmt.Fprintf(writer, ">%s\n", minBuf)
         if err != nil {

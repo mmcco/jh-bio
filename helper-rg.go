@@ -225,12 +225,12 @@ func boolToInt(a bool) int {
     }
 }
 
-// Takes as an argument the index of a minimizer in RepeatGenome.SortedUniqMins - NOT the minimizer's actual value.
+// Takes as an argument the index of a minimizer in RepeatGenome.SortedMins - NOT the minimizer's actual value.
 // Returns the indices of the minimizer's kmer range in RepeatGenome.Kmers
 func (rg *RepeatGenome) getMinIndices(minIndex uint64) (uint64, uint64) {
     startInd := rg.OffsetsToMin[minIndex]
     var endInd uint64
-    if minIndex == uint64(len(rg.SortedUniqMins)) - 1 {
+    if minIndex == uint64(len(rg.SortedMins)) - 1 {
         endInd = uint64(len(rg.Kmers))
     } else {
         endInd = rg.OffsetsToMin[minIndex+1]
@@ -238,10 +238,26 @@ func (rg *RepeatGenome) getMinIndices(minIndex uint64) (uint64, uint64) {
     return startInd, endInd
 }
 
-// Takes as an argument the index of a minimizer in RepeatGenome.SortedUniqMins - NOT the minimizer's actual value.
+// Takes as an argument the index of a minimizer in RepeatGenome.SortedMins - NOT the minimizer's actual value.
 // Returns a slice of the kmers associated with that minimizer.
 // Intended for non-performance-critical sections, like file writing.
 func (rg *RepeatGenome) getMinsKmers(minIndex uint64) []Kmer {
     startInd, endInd := rg.getMinIndices(minIndex)
     return rg.Kmers[startInd : endInd]
+}
+
+func ceilDiv_U64(a, b uint64) uint64 {
+    if a == 0 {
+        return 0
+    } else {
+        return ((a - 1) / b) + 1
+    }
+}
+
+func ceilDiv_64(a, b int64) int64 {
+    return ((a - 1) / b) + 1
+}
+
+func ceilDiv(a, b int) int {
+    return ((a - 1) / b) + 1
 }
