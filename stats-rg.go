@@ -1,6 +1,7 @@
 package repeatgenome
 
 import (
+    "bytes"
     "unsafe"
 )
 
@@ -196,4 +197,23 @@ func (rg *RepeatGenome) PercentTrueClassifications(responses []ReadSAMResponse, 
         }
     }
     return 100 * (float64(correctClassifications) / float64(classifications))
+}
+
+func (rg *RepeatGenome) numKmers() uint64 {
+    var k_ = int(k)
+    var numKmers uint64 = 0
+
+    splitOnN := func(c rune) bool { return c == 'n' }
+
+    for i := range rg.Matches {
+        match := &rg.Matches[i]
+        seq := rg.chroms[match.SeqName][match.SeqName][match.SeqStart:match.SeqEnd]
+        seqs := bytes.FieldsFunc([]byte(seq), splitOnN)
+        for j := range seqs {
+            if len(seqs[j]) >= k_ {
+                numKmers += uint64(len(seqs[j]) - k_ + 1)
+            }
+        }
+    }
+    return numKmers
 }

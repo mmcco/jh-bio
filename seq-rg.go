@@ -2,7 +2,6 @@ package repeatgenome
 
 import (
     "fmt"
-    "unsafe"
 )
 // General sequence-manipulation functions.
 
@@ -318,6 +317,7 @@ func Debug() {
     fmt.Println()
 }
 
+/*
 func (kmerInt KmerInt) MinKey() MinKey {
     var currMin MinInt = ^MinInt(0)
     var currKey MinKey = ^MinKey(0)
@@ -345,7 +345,9 @@ func (kmerInt KmerInt) MinKey() MinKey {
 
     return currKey
 }
+*/
 
+/*
 func (minPair MinPair) getMin() MinInt {
     minKey := *(*MinKey)(unsafe.Pointer(&minPair[8]))
     isRevComp := false
@@ -363,3 +365,4 @@ func (minPair MinPair) getMin() MinInt {
         return minInt
     }
 }
+*/

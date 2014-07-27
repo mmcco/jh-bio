@@ -13,6 +13,8 @@ package repeatgenome
 
    Premature commenting is the root of all evil, and I have sinned. Please read comments skeptically - they will eventually be audited.
 
+   Functions for pointer accesses?
+
    We should probably just store minimizers fully - they're only 32 bits
 
    KmerInt.Minimize() logic could be changed now that minimizers are 32 bits
@@ -168,6 +170,7 @@ type KmerInts []KmerInt
 type MinInt uint32
 type MinInts []MinInt
 
+/*
 // Indexes the base of the associated kmer that is the starting index of its minimizer
 // If < 32, the minimizer is the positive strand representation
 // Otherwise, the minimizer is the reverse complement of kmer[minkey-32 : minkey+m-32]
@@ -176,6 +179,10 @@ type MinKey uint8
 // Stores a KmerInt and a MinKey in that order
 type MinPair [9]byte
 type MinPairs []MinPair
+*/
+
+type MinPair [12]byte
+type MinPairs []MinPair
 
 // can store a kmer where k <= 32
 // the value of k is not stored in the struct, but rather in the RepeatGenome, for memory efficiency
@@ -183,9 +190,8 @@ type MinPairs []MinPair
 // the last two are the LCA ID
 type Kmer [10]byte
 
-// Like a Kmer, but with a one-byte MinKey between the KmerInt and the LCA ID.
-// It can also be seen as a MinPair with an LCA ID appended
-type FullKmer [11]byte
+// Like a Kmer, but with a MinInt between the KmerInt and the LCA ID.
+type FullKmer [14]byte
 type FullKmers []FullKmer
 
 // as with the Kmer type, each base is represented by two bits
@@ -454,10 +460,13 @@ func Generate(genomeName string, k_arg, m_arg uint8, rgFlags Flags) (error, *Rep
     rg.getRepeats()
     rg.getClassTree()
 
-    if !rg.Flags.Minimize {
+    /*
+    if rg.Flags.Minimize {
         // calling the parallel minimizer and writing the result
         rg.getKrakenSlice()
-    } else {
+    }
+    */
+    if rg.Flags.Minimize {
         rg.getMinPairSlices()
         os.Exit(0)
     }
@@ -612,6 +621,7 @@ func (rg *RepeatGenome) getClassTree() {
     }
 }
 
+/*
 // returns ancestry list, beginning at (and including) self, excluding root
 func (cn *ClassNode) getAncestry() []*ClassNode {
     ancestry := []*ClassNode{}
@@ -622,6 +632,7 @@ func (cn *ClassNode) getAncestry() []*ClassNode {
     }
     return ancestry
 }
+*/
 
 func (classTree *ClassTree) getLCA(cnA, cnB *ClassNode) *ClassNode {
     for cnBWalker := cnB; cnBWalker != classTree.Root; cnBWalker = cnBWalker.Parent {
@@ -634,6 +645,7 @@ func (classTree *ClassTree) getLCA(cnA, cnB *ClassNode) *ClassNode {
     return classTree.Root
 }
 
+/*
 // some of the logic in here is deeply nested or non-obvious for efficiency's sake
 // specifically, we made sure not to make any heap allocations, which means reverse complements can never be explicitly evaluated
 func (rg *RepeatGenome) minimizeThread(matchStart, matchEnd uint64, c chan ThreadResponse) {
@@ -666,12 +678,7 @@ func (rg *RepeatGenome) minimizeThread(matchStart, matchEnd uint64, c chan Threa
             kmerInt = minKmerInt(kmerInt, kmerInt.revComp())
 
             thisMin := kmerInt.Minimize()
-            /*
-            if match.ClassNode == nil {
-                fmt.Println("current match's repeat:", match.RepeatName)
-                panic("minimizeThread(): match has nil ClassNode")
-            }
-            */
+
             c <- ThreadResponse{kmerInt, thisMin, match.ClassNode}
         }
     }
@@ -831,25 +838,7 @@ func (rg *RepeatGenome) populateKraken(minToKmers map[MinInt]*MuxKmers) error {
 
     return nil
 }
-
-func (rg *RepeatGenome) numKmers() uint64 {
-    var k_ = int(k)
-    var numKmers uint64 = 0
-
-    splitOnN := func(c rune) bool { return c == 'n' }
-
-    for i := range rg.Matches {
-        match := &rg.Matches[i]
-        seq := rg.chroms[match.SeqName][match.SeqName][match.SeqStart:match.SeqEnd]
-        seqs := bytes.FieldsFunc([]byte(seq), splitOnN)
-        for j := range seqs {
-            if len(seqs[j]) >= k_ {
-                numKmers += uint64(len(seqs[j]) - k_ + 1)
-            }
-        }
-    }
-    return numKmers
-}
+*/
 
 func (rg *RepeatGenome) getMinIndex(minInt MinInt) (bool, uint64) {
     var i uint64 = 0
@@ -1095,7 +1084,7 @@ func (rg *RepeatGenome) getMinPairs(match *Match) MinPairResponse {
         return MinPairResponse{match.ClassNode.ID, nil}
     }
     numKmers := end - start - k_ + 1
-    minPairs := make(MinPairs, numKmers, numKmers)
+    var minPairs MinPairs
 
     var i uint64
 KmerLoop:
@@ -1112,19 +1101,13 @@ KmerLoop:
 
         kmerInt := TextSeq(matchSeq[i : i+k_]).kmerInt()
         kmerInt = minKmerInt(kmerInt, kmerInt.revComp())
-        *(*KmerInt)(unsafe.Pointer(&minPairs[i])) = kmerInt
-        *(*MinKey)(unsafe.Pointer(&minPairs[i][8])) = kmerInt.MinKey()
+        var minPair MinPair
+        *(*KmerInt)(unsafe.Pointer(&minPair)) = kmerInt
+        *(*MinInt)(unsafe.Pointer(&minPair[8])) = kmerInt.Minimize()
+        minPairs = append(minPairs, minPair)
     }
 
     return MinPairResponse{match.ClassNode.ID, minPairs}
-}
-
-func (rg *RepeatGenome) minPairThread(matchChan chan *Match, respChan chan MinPairResponse, wg *sync.WaitGroup) {
-    for match := range matchChan {
-        minPairs := rg.getMinPairs(match)
-        respChan <- minPairs
-    }
-    wg.Done()
 }
 
 func (rg *RepeatGenome) getMinPairSlices() {
@@ -1143,7 +1126,13 @@ func (rg *RepeatGenome) getMinPairSlices() {
     wg.Add(numCPU)
     respChan := make(chan MinPairResponse)
     for i := 0; i < numCPU; i++ {
-        go rg.minPairThread(matchChan, respChan, &wg)
+        go func() {
+            for match := range matchChan {
+                minPairs := rg.getMinPairs(match)
+                respChan <- minPairs
+            }
+            wg.Done()
+        }()
     }
 
     var minPairResps []MinPairResponse
@@ -1156,6 +1145,7 @@ func (rg *RepeatGenome) getMinPairSlices() {
     }()
 
     wg.Wait()
+    close(respChan)
 
     numMinPairs := 0
     for _, resp := range minPairResps {
@@ -1167,15 +1157,17 @@ func (rg *RepeatGenome) getMinPairSlices() {
     for _, resp := range minPairResps {
         for _, minPair := range resp.MinPairs {
             var fullKmer FullKmer
-            *(*[9]byte)(unsafe.Pointer(&fullKmer)) = minPair
-            *(*uint16)(unsafe.Pointer(&fullKmer[9])) = resp.ClassNodeID
+            *(*[12]byte)(unsafe.Pointer(&fullKmer)) = minPair
+            *(*uint16)(unsafe.Pointer(&fullKmer[12])) = resp.ClassNodeID
             fullKmers = append(fullKmers, fullKmer)
         }
         resp.MinPairs = nil    // aid garbage collection
     }
 
+    /*
     minPairResps = nil
     runtime.GC()
+    */
 
     sort.Sort(fullKmers)
     fmt.Println("raw kmer list sorted")
@@ -1196,8 +1188,10 @@ func (rg *RepeatGenome) getMinPairSlices() {
     */
     rg.parallelFullKmers(fullKmers)
 
+    /*
     fullKmers = nil
     runtime.GC()
+    */
 
     fmt.Println(comma(uint64(len(rg.FullKmers))), "unique kmers processed")
 }
@@ -1211,22 +1205,22 @@ func (rg *RepeatGenome) parallelFullKmers(fullKmers FullKmers) {
     numCPU := runtime.NumCPU()
     runtime.GOMAXPROCS(numCPU)
 
-    pairChan := make(chan ReducePair)
+    pairChan := make(chan ReducePair, 500)
     var wg sync.WaitGroup
     wg.Add(numCPU)
 
     for i := 0; i < numCPU; i++ {
         go func() {
             for pair := range pairChan {
-                lcaID := *(*uint16)(unsafe.Pointer(&pair.Set[0][9]))
+                lcaID := *(*uint16)(unsafe.Pointer(&pair.Set[0][12]))
                 currLCA := rg.ClassTree.NodesByID[lcaID]
 
                 for i := 1; i < len(pair.Set); i++ {
-                    lcaID = *(*uint16)(unsafe.Pointer(&pair.Set[i][9]))
+                    lcaID = *(*uint16)(unsafe.Pointer(&pair.Set[i][12]))
                     currLCA = rg.ClassTree.getLCA(currLCA, rg.ClassTree.NodesByID[lcaID])
                 }
 
-                *(*uint16)(unsafe.Pointer(pair.Loc)) = currLCA.ID
+                *(*uint16)(unsafe.Pointer(&pair.Loc[12])) = currLCA.ID
             }
             wg.Done()
         }()
