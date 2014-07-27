@@ -237,6 +237,26 @@ func (minPairs MinPairs) Less(i, j int) bool {
     }
 }
 
+func (fullKmers FullKmers) Len() int {
+    return len(fullKmers)
+}
+
+func (fullKmers FullKmers) Swap(i, j int) {
+    fullKmers[i], fullKmers[j] = fullKmers[j], fullKmers[i]
+}
+
+func (fullKmers FullKmers) Less(i, j int) bool {
+    iMin := ((*MinPair)(unsafe.Pointer(&fullKmers[i]))).getMin()
+    jMin := ((*MinPair)(unsafe.Pointer(&fullKmers[j]))).getMin()
+    if iMin < jMin {
+        return true
+    } else if iMin > jMin {
+        return false
+    } else {
+        return *(*KmerInt)(unsafe.Pointer(&fullKmers[i])) < *(*KmerInt)(unsafe.Pointer(&fullKmers[j]))
+    }
+}
+
 func boolToInt(a bool) int {
     if a {
         return 1

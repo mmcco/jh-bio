@@ -118,6 +118,7 @@ type Match struct {
     RepeatName string
     ClassNode  *ClassNode
     Repeat     *Repeat
+    ID         uint64
 }
 
 type RepeatGenome struct {
@@ -127,7 +128,7 @@ type RepeatGenome struct {
     // as discussed above, though, matches only contain 1D sequence indexes
     chroms         map[string](map[string]TextSeq)
     Kmers          Kmers
-    MinPairs       MinPairs
+    FullKmers      FullKmers
     // stores the offset of each minimizer's first kmer in RepeatGenome.Kmers - indexed by the minimizer's index in SortedMins
     OffsetsToMin   []uint64
     // stores the number of kmers that each minimizer is associated with
@@ -179,6 +180,11 @@ type MinPairs []MinPair
 // first eight bits are the int representation of the sequence
 // the last two are the LCA ID
 type Kmer [10]byte
+
+// Like a Kmer, but with a one-byte MinKey between the KmerInt and the LCA ID.
+// It can also be seen as a MinPair with an LCA ID appended
+type FullKmer [11]byte
+type FullKmers []FullKmer
 
 // as with the Kmer type, each base is represented by two bits
 // any excess bits are the first bits of the first byte (seq is right-justified)
@@ -347,6 +353,8 @@ func parseMatches(genomeName string) (error, Matches) {
 
         match.RepeatName = strings.Join(match.RepeatClass, "/")
 
+        match.ID = uint64(len(matches))
+
         matches = append(matches, match)
     }
     return nil, matches
@@ -409,8 +417,14 @@ func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
 
 func Generate(genomeName string, k_arg, m_arg uint8, rgFlags Flags) (error, *RepeatGenome) {
     var err error
+    if m > k {
+        return fmt.Errorf("m must be <= k"), nil
+    }
     k = k_arg
-    k = k_arg
+    m = m_arg
+    fmt.Println("k =", k)
+    fmt.Println("m =", m)
+    fmt.Println()
     // we popoulate the RepeatGenome mostly with helper functions
     // we should consider whether it makes more sense for them to alter the object directly, than to return their results
     rg := new(RepeatGenome)
@@ -1064,14 +1078,19 @@ func (rg *RepeatGenome) ProcessReads() (error, chan ReadResponse) {
     return nil, rg.GetReadClassChan(reads)
 }
 
-// WARNING: Will return nil rather than empty slice
+type MinPairResponse struct {
+    ClassNodeID uint16
+    MinPairs MinPairs
+}
+
+// WARNING: Will return nil rather than empty slice in response.MinPairs
 // Could probably use a map to prevent duplicates in the future, although this wouldn't make a difference if the slice size were still manually chosen
-func (rg *RepeatGenome) getMinPairs(match Match) MinPairs {
+func (rg *RepeatGenome) getMinPairs(match *Match) MinPairResponse {
     k_ := uint64(k)
     start, end := match.SeqStart, match.SeqEnd
     matchSeq := rg.chroms[match.SeqName][match.SeqName][start : end]
     if len(matchSeq) < int(k) {
-        return nil
+        return MinPairResponse{match.ClassNode.ID, nil}
     }
     numKmers := end - start - k_ + 1
     minPairs := make(MinPairs, numKmers, numKmers)
@@ -1086,51 +1105,127 @@ KmerLoop:
                 i += uint64(j)
                 continue KmerLoop
             }
-            if j == 0 { continue KmerLoop }
+            if j == 0 { break }
         }
 
         kmerInt := TextSeq(matchSeq[i : i+k_]).kmerInt()
+        kmerInt = minKmerInt(kmerInt, kmerInt.revComp())
         *(*KmerInt)(unsafe.Pointer(&minPairs[i])) = kmerInt
         *(*MinKey)(unsafe.Pointer(&minPairs[i][8])) = kmerInt.MinKey()
     }
 
-    return minPairs
+    return MinPairResponse{match.ClassNode.ID, minPairs}
+}
+
+func (rg *RepeatGenome) minPairThread(matchChan chan *Match, respChan chan MinPairResponse, wg *sync.WaitGroup) {
+    for match := range matchChan {
+        minPairs := rg.getMinPairs(match)
+        respChan <- minPairs
+    }
+    wg.Done()
 }
 
 func (rg *RepeatGenome) getMinPairSlices() {
-    var minPairSlices []MinPairs
-    for i := range rg.Matches {
-        minPairs := rg.getMinPairs(rg.Matches[i])
-        if minPairs != nil {
-            minPairSlices = append(minPairSlices, minPairs)
+    numCPU := runtime.NumCPU()
+    runtime.GOMAXPROCS(numCPU)
+
+    matchChan := make(chan *Match)
+    go func() {
+        for i := range rg.Matches {
+            matchChan <- &rg.Matches[i]
+        }
+        close(matchChan)
+    }()
+
+    var wg sync.WaitGroup
+    wg.Add(numCPU)
+    respChan := make(chan MinPairResponse)
+    for i := 0; i < numCPU; i++ {
+        go rg.minPairThread(matchChan, respChan, &wg)
+    }
+
+    var minPairResps []MinPairResponse
+    go func() {
+        for resp := range respChan {
+            if resp.MinPairs != nil {
+                minPairResps = append(minPairResps, resp)
+            }
+        }
+    }()
+
+    wg.Wait()
+
+    numMinPairs := 0
+    for _, resp := range minPairResps {
+        numMinPairs += len(resp.MinPairs)
+    }
+    fmt.Println("total number of (non-unique) kmers processed:", comma(uint64(numMinPairs)))
+
+    fullKmers := make(FullKmers, 0, numMinPairs)
+    for _, resp := range minPairResps {
+        for _, minPair := range resp.MinPairs {
+            var fullKmer FullKmer
+            *(*[9]byte)(unsafe.Pointer(&fullKmer)) = minPair
+            *(*uint16)(unsafe.Pointer(&fullKmer[9])) = resp.ClassNodeID
+            fullKmers = append(fullKmers, fullKmer)
+        }
+        resp.MinPairs = nil    // aid garbage collection
+    }
+
+    minPairResps = nil
+    runtime.GC()
+
+    sort.Sort(fullKmers)
+    // make rg.MinPairs unique
+    if len(fullKmers) > 0 {
+        rg.FullKmers = append(rg.FullKmers, fullKmers[0])
+    }
+    for i := 1; i < len(fullKmers); i++ {
+        if *(*uint64)(unsafe.Pointer(&fullKmers[i])) != *(*uint64)(unsafe.Pointer(&fullKmers[i-1])) {
+            rg.FullKmers = append(rg.FullKmers, fullKmers[i])
+        } else {
+            lastLCA := rg.ClassTree.NodesByID[*(*uint16)(unsafe.Pointer(&rg.FullKmers[len(rg.FullKmers)-1][9]))]
+            newNode := rg.ClassTree.NodesByID[*(*uint16)(unsafe.Pointer(&fullKmers[i][9]))]
+            *(*uint16)(unsafe.Pointer(&rg.FullKmers[len(rg.FullKmers)-1])) = rg.ClassTree.getLCA(lastLCA, newNode).ID
         }
     }
 
-    cnt := 0
-    for _, t := range minPairSlices {
-        cnt += len(t)
-    }
-    fmt.Println("total number of (non-unique) kmers processed:", cnt)
+    fullKmers = nil
+    runtime.GC()
 
-    var minPairs MinPairs
-    // this odd loop logic is to ensure that the used slices can be garbage collected during loop execution, in case we're running out of RAM
-    for i := len(minPairSlices); i > 0; i-- {
-        for _, minPair := range minPairSlices[i] {
-            minPairs = append(minPairs, minPair)
-        }
-        minPairSlices = minPairSlices[:i-1]
-    }
-
-    sort.Sort(minPairs)
-    if len(minPairs) > 0 {
-        rg.MinPairs[0] = minPairs[0]
-    }
-    for i := 1; i < len(minPairs); i++ {
-        if minPairs[i] != minPairs[i-1] {
-            rg.MinPairs = append(rg.MinPairs, minPairs[i])
-        }
-    }
-
-    fmt.Println(len(rg.MinPairs), "unique kmers processed")
+    fmt.Println(comma(uint64(len(rg.FullKmers))), "unique kmers processed")
 }
 
+type ReducePair struct {
+    Loc *FullKmer
+    Set FullKmers
+}
+
+func (rg *RepeatGenome) parallelFullKmers(fullKmers FullKmers) {
+    numCPU := runtime.NumCPU()
+    runtime.GOMAXPROCS(numCPU)
+
+    for i := 0; i < numCPU; i++ {
+        go func() {
+            pair := <-pairChan
+            var reducedKmer FullKmer = pair.Set[0]
+            lcaID := *(*uint16)(unsafe.Pointer(&reducedKmer[9]))
+            currLCA := rg.ClassTree.NodesByID[lcaID]
+
+            for i := 1; i < len(pair.Set); i++ {
+                lcaID = *(*uint16)()
+                currLCA = getLCA(currLCA, newNode)
+            }
+    }
+
+    numKmers := uint64(len(fullKmers))
+    start, end uint64 = 0, 0
+    for end < numKmers {
+        start = end
+        end++
+        for end < numKmers && *(*uint64)(unsafe.Pointer(&fullKmers[end])) == *(*uint64)(unsafe.Pointer(&fullKmers[end+1])) {
+            end++
+        }
+        kmerChan <- {rg.Kmers[len(rg.FullKmers)-1], fullKmers[start : end]}
+    }
+}
