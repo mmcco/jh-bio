@@ -59,7 +59,7 @@ func (classNode *ClassNode) Size() uint64 {
     return classNodeSize
 }
 
-func (readResp ReadResponse) HangingSize(k uint8) uint64 {
+func (readResp ReadResponse) HangingSize() uint64 {
     classNode := readResp.ClassNode
     if classNode == nil {
         return 0
@@ -75,7 +75,7 @@ func (readResp ReadResponse) HangingSize(k uint8) uint64 {
     }
 
     for _, child := range classNode.Children {
-        classNodeSize += ReadResponse{readResp.Seq, child}.HangingSize(k)
+        classNodeSize += ReadResponse{readResp.Seq, child}.HangingSize()
     }
 
     return classNodeSize
@@ -92,7 +92,7 @@ func (rg *RepeatGenome) AvgPossPercentGenome(resps []ReadResponse, strict bool) 
     } else {
         for _, resp := range resps {
             if _, exists := classNodeSizes[resp.ClassNode]; !exists {
-                classNodeSizes[resp.ClassNode] = float64(resp.HangingSize(rg.K))
+                classNodeSizes[resp.ClassNode] = float64(resp.HangingSize())
             }
         }
     }
@@ -122,7 +122,7 @@ func (rg *RepeatGenome) recNodeSearch(classNode *ClassNode, readSAM ReadSAM, str
                 if readSAM.StartInd > match.SeqStart {
                     overlap -= readSAM.StartInd - match.SeqStart
                 }
-                if overlap >= uint64(rg.K) {
+                if overlap >= uint64(k) {
                     return true
                 }
             }

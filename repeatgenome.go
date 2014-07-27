@@ -27,8 +27,6 @@ package repeatgenome
 
    Should consider splitting at hyphenated class names like TcMar-Tc1
 
-   For portability's sake, the flags should be used as args to Generate() rather than globals.
-
    The concurrent read-kmer generator could be reintroduced using a select statement.
 
    Should probably restrict activity of chans with directionals
@@ -38,16 +36,6 @@ package repeatgenome
    Kmer counting should be re-added eventually - it's currently excluded for performance reasons because we aren't using it.
 
    We should test a version that doesn't cache minimizers, as that seems to be a needless bottleneck. It could also be conditional on the number of CPUs available.
-
-   Minimizers are currently not written to file in any order. This is for memory efficiency, and can be changed in the future.
-
-   I should probably change some variable names, like repeatGenome, to less verbose variants, and use more aliases.
-
-   Ranges should be changed to use actual values instead of indexes.
-
-   Slice sizes should be specified in the make() call when the size is known.
-
-   seqToInt and revCompToInt need minor cleanup and a potential name-change.
 
    All sequences containing Ns are currently ignored.
 
@@ -77,6 +65,9 @@ import (
     "sync"
     "unsafe"
 )
+
+// These variables are used ubiquitously, especially in performance-critical functions, so we grudgingly make them globals
+var k, m uint8
 
 type Flags struct {
     Debug       bool
@@ -135,9 +126,8 @@ type RepeatGenome struct {
     // maps a chromosome name to a map of its sequences
     // as discussed above, though, matches only contain 1D sequence indexes
     chroms         map[string](map[string]TextSeq)
-    K              uint8
-    M              uint8
     Kmers          Kmers
+    MinPairs       MinPairs
     // stores the offset of each minimizer's first kmer in RepeatGenome.Kmers - indexed by the minimizer's index in SortedMins
     OffsetsToMin   []uint64
     // stores the number of kmers that each minimizer is associated with
@@ -175,6 +165,15 @@ type KmerInts []KmerInt
 type MinInt uint32
 type MinInts []MinInt
 
+// Indexes the base of the associated kmer that is the starting index of its minimizer
+// If < 32, the minimizer is the positive strand representation
+// Otherwise, the minimizer is the reverse complement of kmer[minkey-32 : minkey+m-32]
+type MinKey uint8
+
+// Stores a KmerInt and a MinKey in that order
+type MinPair [9]byte
+type MinPairs []MinPair
+
 // can store a kmer where k <= 32
 // the value of k is not stored in the struct, but rather in the RepeatGenome, for memory efficiency
 // first eight bits are the int representation of the sequence
@@ -183,9 +182,9 @@ type Kmer [10]byte
 
 // as with the Kmer type, each base is represented by two bits
 // any excess bits are the first bits of the first byte (seq is right-justified)
-// remember that len(Seq.Bases) is not the actual number of bases, but rather the number of bytes necessary to represent them
+// remember that len(Seq.Bytes) is not the actual number of bases, but rather the number of bytes necessary to represent them
 type Seq struct {
-    Bases []byte
+    Bytes []byte
     Len   uint64
 }
 
@@ -230,10 +229,12 @@ type Matches []Match
 
 //type Chroms map[string](map[string]TextSeq)
 
+/*
 type MinPair struct {
     KmerInt   Kmer
     Minimizer MinInt
 }
+*/
 
 type ThreadResponse struct {
     KmerInt   KmerInt
@@ -406,8 +407,10 @@ func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
     return nil, chroms
 }
 
-func Generate(genomeName string, k, m uint8, rgFlags Flags) (error, *RepeatGenome) {
+func Generate(genomeName string, k_arg, m_arg uint8, rgFlags Flags) (error, *RepeatGenome) {
     var err error
+    k = k_arg
+    k = k_arg
     // we popoulate the RepeatGenome mostly with helper functions
     // we should consider whether it makes more sense for them to alter the object directly, than to return their results
     rg := new(RepeatGenome)
@@ -434,12 +437,13 @@ func Generate(genomeName string, k, m uint8, rgFlags Flags) (error, *RepeatGenom
     }
     rg.getRepeats()
     rg.getClassTree()
-    rg.K = k
-    rg.M = m
 
-    if rg.Flags.Minimize {
+    if !rg.Flags.Minimize {
         // calling the parallel minimizer and writing the result
         rg.getKrakenSlice()
+    } else {
+        rg.getMinPairSlices()
+        os.Exit(0)
     }
 
     if rg.Flags.WriteJSON {
@@ -485,9 +489,9 @@ func (rg *RepeatGenome) RunDebugTests() {
     fmt.Println()
 
     testSeq := TextSeq("atgtttgtgtttttcataaagacgaaagatg")
-    thisMin := testSeq.kmerInt().Minimize(uint8(len(testSeq)), 15)
-    fmt.Println("getMinimizer('tgctcctgtcatgcatacgcaggtcatgcat', 15): ")
-    thisMin.print(15)
+    thisMin := testSeq.kmerInt().Minimize()
+    fmt.Println("getMinimizer('tgctcctgtcatgcatacgcaggtcatgcat'): ")
+    thisMin.print()
     fmt.Println()
 
     fmt.Printf("Kmer struct size: %d\n", unsafe.Sizeof(Kmer{}))
@@ -560,6 +564,7 @@ func (rg *RepeatGenome) getClassTree() {
                 } else {
                     classNode.Parent = tree.ClassNodes[strings.Join(thisClass[:len(thisClass)-1], "/")]
                 }
+
                 if classNode.Parent.Children == nil {
                     classNode.Parent.Children = make([]*ClassNode, 0)
                 }
@@ -616,9 +621,7 @@ func (classTree *ClassTree) getLCA(cnA, cnB *ClassNode) *ClassNode {
 // some of the logic in here is deeply nested or non-obvious for efficiency's sake
 // specifically, we made sure not to make any heap allocations, which means reverse complements can never be explicitly evaluated
 func (rg *RepeatGenome) minimizeThread(matchStart, matchEnd uint64, c chan ThreadResponse) {
-    k := rg.K
     k_ := uint64(k)
-    m := rg.M
 
     for i := matchStart; i < matchEnd; i++ {
         match := &rg.Matches[i]
@@ -644,9 +647,9 @@ func (rg *RepeatGenome) minimizeThread(matchStart, matchEnd uint64, c chan Threa
 
             kmerInt := TextSeq(seq[j : j+k_]).kmerInt()
             // make the sequence strand-agnostic
-            kmerInt = minKmerInt(kmerInt, kmerInt.revComp(k))
+            kmerInt = minKmerInt(kmerInt, kmerInt.revComp())
 
-            thisMin := kmerInt.Minimize(k, m)
+            thisMin := kmerInt.Minimize()
             /*
             if match.ClassNode == nil {
                 fmt.Println("current match's repeat:", match.RepeatName)
@@ -814,7 +817,7 @@ func (rg *RepeatGenome) populateKraken(minToKmers map[MinInt]*MuxKmers) error {
 }
 
 func (rg *RepeatGenome) numKmers() uint64 {
-    var k = int(rg.K)
+    var k_ = int(k)
     var numKmers uint64 = 0
 
     splitOnN := func(c rune) bool { return c == 'n' }
@@ -824,8 +827,8 @@ func (rg *RepeatGenome) numKmers() uint64 {
         seq := rg.chroms[match.SeqName][match.SeqName][match.SeqStart:match.SeqEnd]
         seqs := bytes.FieldsFunc([]byte(seq), splitOnN)
         for j := range seqs {
-            if len(seqs[j]) >= k {
-                numKmers += uint64(len(seqs[j]) - k + 1)
+            if len(seqs[j]) >= k_ {
+                numKmers += uint64(len(seqs[j]) - k_ + 1)
             }
         }
     }
@@ -852,7 +855,7 @@ func (rg *RepeatGenome) getMinIndex(minInt MinInt) (bool, uint64) {
 }
 
 func (rg *RepeatGenome) getKmer(kmerInt KmerInt) *Kmer {
-    minimizer := kmerInt.Minimize(rg.K, rg.M)
+    minimizer := kmerInt.Minimize()
     minExists, minIndex := rg.getMinIndex(minimizer)
     if !minExists {
         return nil
@@ -902,14 +905,14 @@ func (rg *RepeatGenome) kmerSeqFeed(seq TextSeq) chan uint64 {
     c := make(chan uint64)
 
     go func() {
-        numKmers := uint8(len(seq)) - (rg.K - 1)
+        numKmers := uint8(len(seq)) - (k - 1)
         var i uint8
     KmerLoop:
         for i = 0; i < numKmers; i++ {
-            kmerSeq := seq[i : i+rg.K]
+            kmerSeq := seq[i : i+k]
 
             // an ugly but necessary n-skipper
-            for j := rg.K - 1; j >= 0; j-- {
+            for j := k - 1; j >= 0; j-- {
                 if kmerSeq[j] == byte('n') {
                     i += j
                     continue KmerLoop
@@ -919,7 +922,7 @@ func (rg *RepeatGenome) kmerSeqFeed(seq TextSeq) chan uint64 {
             }
 
             kmerInt := seqToInt(string(kmerSeq))
-            c <- minU64(kmerInt, intRevComp(kmerInt, rg.K))
+            c <- minU64(kmerInt, intRevComp(kmerInt, k))
         }
     }()
 
@@ -939,7 +942,7 @@ func (rg *RepeatGenome) ClassifyReads(readTextSeqs []TextSeq, responseChan chan 
     var kmerSet map[KmerInt]bool
     var byteBuf TextSeq
     if rg.Flags.Debug {
-        byteBuf = make(TextSeq, rg.K, rg.K)
+        byteBuf = make(TextSeq, k, k)
         kmerSet = make(map[KmerInt]bool, len(rg.Kmers))
         for _, kmer := range rg.Kmers {
             kmerSeq := *(*KmerInt)(unsafe.Pointer(&kmer[0]))
@@ -952,7 +955,7 @@ ReadLoop:
     for _, read := range readTextSeqs {
         // we use sign int64s in this triple-nested loop because the innermost one counts down and would otherwise overflow
         // this isn't a significant limitation because reads are never big enough to overflow one
-        k_ := int64(rg.K)
+        k_ := int64(k)
         numKmers := int64(len(read)) - k_ + 1
 
         var i int64
@@ -969,7 +972,7 @@ ReadLoop:
 
             kmerBytes := read[i : i+k_]
             kmerInt := kmerBytes.kmerInt()
-            kmerInt = minKmerInt(kmerInt, kmerInt.revComp(rg.K))
+            kmerInt = minKmerInt(kmerInt, kmerInt.revComp())
             kmer := rg.getKmer(kmerInt)
 
             if rg.Flags.Debug && kmer == nil && kmerSet[kmerInt] {
@@ -1060,3 +1063,74 @@ func (rg *RepeatGenome) ProcessReads() (error, chan ReadResponse) {
 
     return nil, rg.GetReadClassChan(reads)
 }
+
+// WARNING: Will return nil rather than empty slice
+// Could probably use a map to prevent duplicates in the future, although this wouldn't make a difference if the slice size were still manually chosen
+func (rg *RepeatGenome) getMinPairs(match Match) MinPairs {
+    k_ := uint64(k)
+    start, end := match.SeqStart, match.SeqEnd
+    matchSeq := rg.chroms[match.SeqName][match.SeqName][start : end]
+    if len(matchSeq) < int(k) {
+        return nil
+    }
+    numKmers := end - start - k_ + 1
+    minPairs := make(MinPairs, numKmers, numKmers)
+
+    var i uint64
+KmerLoop:
+    for i = 0; i < numKmers; i++ {
+
+        // loop logic uses manual condition to prevent unsigned int overflow
+        for j := k_ - 1; ; j-- {
+            if matchSeq[i+j] == 'n' {
+                i += uint64(j)
+                continue KmerLoop
+            }
+            if j == 0 { continue KmerLoop }
+        }
+
+        kmerInt := TextSeq(matchSeq[i : i+k_]).kmerInt()
+        *(*KmerInt)(unsafe.Pointer(&minPairs[i])) = kmerInt
+        *(*MinKey)(unsafe.Pointer(&minPairs[i][8])) = kmerInt.MinKey()
+    }
+
+    return minPairs
+}
+
+func (rg *RepeatGenome) getMinPairSlices() {
+    var minPairSlices []MinPairs
+    for i := range rg.Matches {
+        minPairs := rg.getMinPairs(rg.Matches[i])
+        if minPairs != nil {
+            minPairSlices = append(minPairSlices, minPairs)
+        }
+    }
+
+    cnt := 0
+    for _, t := range minPairSlices {
+        cnt += len(t)
+    }
+    fmt.Println("total number of (non-unique) kmers processed:", cnt)
+
+    var minPairs MinPairs
+    // this odd loop logic is to ensure that the used slices can be garbage collected during loop execution, in case we're running out of RAM
+    for i := len(minPairSlices); i > 0; i-- {
+        for _, minPair := range minPairSlices[i] {
+            minPairs = append(minPairs, minPair)
+        }
+        minPairSlices = minPairSlices[:i-1]
+    }
+
+    sort.Sort(minPairs)
+    if len(minPairs) > 0 {
+        rg.MinPairs[0] = minPairs[0]
+    }
+    for i := 1; i < len(minPairs); i++ {
+        if minPairs[i] != minPairs[i-1] {
+            rg.MinPairs = append(rg.MinPairs, minPairs[i])
+        }
+    }
+
+    fmt.Println(len(rg.MinPairs), "unique kmers processed")
+}
+

@@ -2,6 +2,7 @@ package repeatgenome
 
 import (
     "fmt"
+    "unsafe"
 )
 // General sequence-manipulation functions.
 
@@ -109,14 +110,10 @@ func (seq TextSeq) revCompMinInt() MinInt {
     return minInt
 }
 
-func (kmerInt KmerInt) revComp(seqLen uint8) KmerInt {
-    if seqLen > 31 {
-        panic("seqLen provided to KmerInt.revComp too large")
-    }
-
+func (kmerInt KmerInt) revComp() KmerInt {
     var revComp KmerInt = 0
     var i uint8
-    for i = 0; i < seqLen; i++ {
+    for i = 0; i < k; i++ {
         // should execute before every loop but the first
         if i != 0 {
             revComp <<= 2
@@ -141,14 +138,10 @@ func (kmerInt KmerInt) revComp(seqLen uint8) KmerInt {
     return revComp
 }
 
-func (minInt MinInt) revComp(seqLen uint8) MinInt {
-    if seqLen > 15 {
-        panic("seqLen provided to MinInt.revComp too large")
-    }
-
+func (minInt MinInt) revComp() MinInt {
     var revComp MinInt = 0
     var i uint8
-    for i = 0; i < seqLen; i++ {
+    for i = 0; i < m; i++ {
         // should execute before every loop but the first
         if i != 0 {
             revComp <<= 2
@@ -173,7 +166,7 @@ func (minInt MinInt) revComp(seqLen uint8) MinInt {
     return revComp
 }
 
-func (kmerInt KmerInt) Minimize(k, m uint8) MinInt {
+func (kmerInt KmerInt) Minimize() MinInt {
     if m > k || m < 1 {
         panic("KmerInt.Minimize(): m must be <= k and > 0")
     }
@@ -191,7 +184,7 @@ func (kmerInt KmerInt) Minimize(k, m uint8) MinInt {
         possMin := kmerInt << (2 * (numExtraBases + i))
         // return to proper alignment
         possMin >>= 64 - 2*m
-        possMin = minKmerInt(possMin, possMin.revComp(m))
+        possMin = minKmerInt(possMin, possMin.revComp())
 
         if possMin < currMin {
             currMin = possMin
@@ -246,101 +239,127 @@ func (a TextSeq) Less(b TextSeq) bool {
     return false
 }
 
-func (seqStr TextSeq) Seq() Seq {
-    // ceiling division of len(seqStr) by 4
-    var numBytes uint64 = 1 + ((uint64(len(seqStr)) - 1) / 4)
-    seq := Seq{make([]byte, numBytes, numBytes), uint64(len(seqStr))}
-    basesInFirstByte := 1 + ((seq.Len - 1) % numBytes)
-
-    seqStrInd := 0
+func (textSeq TextSeq) Seq() Seq {
+    numBases := uint64(len(textSeq))
+    numBytes := ceilDiv_U64(numBases, 4)
+    seq := Seq{
+        Bytes: make([]byte, numBytes, numBytes),
+        Len: numBases,
+    }
     var i uint64
-    for i = 0; i < basesInFirstByte; i++ {
-        seq.Bases[0] <<= 2
-
-        switch seqStr[seqStrInd] {
+    for i = 0; i < uint64(len(textSeq)); i++ {
+        byteInd := i / 4
+        shift := 6 - 2*(i%4)
+        switch textSeq[i] {
         case 'a':
+            // already zero
             break
         case 'c':
-            seq.Bases[0] |= 1
+            seq.Bytes[byteInd] |= (uint8(1) << shift)
             break
         case 'g':
-            seq.Bases[0] |= 2
+            seq.Bytes[byteInd] |= (uint8(2) << shift)
             break
         case 't':
-            seq.Bases[0] |= 3
+            seq.Bytes[byteInd] |= (uint8(3) << shift)
+            break
+        case 'A':
+            // already zero
+            break
+        case 'C':
+            seq.Bytes[byteInd] |= (uint8(1) << shift)
+            break
+        case 'G':
+            seq.Bytes[byteInd] |= (uint8(2) << shift)
+            break
+        case 'T':
+            seq.Bytes[byteInd] |= (uint8(3) << shift)
             break
         default:
-            panic("byte other than 'a', 'c', 'g', or 't' supplied to TextSeq.Seq()")
-        }
-
-        seqStrInd++
-    }
-
-    for i := 1; i < len(seq.Bases); i++ {
-        for j := 0; j < 4; j++ {
-            seq.Bases[i] <<= 2
-
-            switch seqStr[seqStrInd] {
-            case 'a':
-                break
-            case 'c':
-                seq.Bases[i] |= 1
-                break
-            case 'g':
-                seq.Bases[i] |= 2
-                break
-            case 't':
-                seq.Bases[i] |= 3
-                break
-            default:
-                panic("byte other than 'a', 'c', 'g', or 't' supplied to revComp")
-            }
-
-            seqStrInd++
+            panic("TextSeq.GetSeq(): byte other than 'a', 'c', 'g', or 't' encountered")
         }
     }
 
     return seq
 }
 
-func (seq Seq) subseq(start, end uint64) Seq {
-    subSeqLen := end - start
-    if subSeqLen > seq.Len {
-        panic("Seq.subseq(): subsequence larger than parent sequence requested")
+func (seq Seq) Subseq(a, b uint64) Seq {
+    numBytes := ceilDiv_U64(b-a, 4)
+    subseq := Seq{
+        Bytes: make([]byte, numBytes, numBytes),
+        Len: b - a,
     }
-    // the actual number of bytes needed in Seq.Seq, calculated with ceiling division
-    numBytes := ((2*subSeqLen - 1) / 8) + 1
-    subSeq := Seq{make([]byte, numBytes, numBytes), subSeqLen}
-
-    //seqExtraBits := seq.numExtraBits()
-    subSeqExtraBits := subSeq.numExtraBits()
-    // the byte offset (floored, as there is likely a bit offset) of the subseq into seq
-    //byteOffset := (seq.Len - subSeqLen) / 4
-    //var bitOffset uint8 = seqExtraBits - subSeqExtraBits
-
     var i uint64
-    for i = 0; i < subSeqLen; i++ {
-        byteIndex := (i*2 + uint64(subSeqExtraBits)) / 8
-        subSeq.Bases[byteIndex] <<= 2
-        // this method call is probably a performance drag
-        subSeq.Bases[byteIndex] |= seq.getBase(i + start)
+    for i = 0; i < subseq.Len; i++ {
+        subseq.Bytes[i / 4] |= seq.GetBase(i + a) << (6 - 2*(i%4))
     }
+    return subseq
+}
+
+func (seq Seq) GetBase(i uint64) uint8 {
+    thisByte := seq.Bytes[i / 4]
+    return thisByte >> (6 - 2*(i%4))
+}
+
+func Debug() {
+    ts := TextSeq("tgaatatacgtagctctagctagcgcttatatg")
+    fmt.Println("ts:", ts)
+    s := ts.Seq()
+    fmt.Print("s: ")
+    s.Print()
+    fmt.Println()
+    fmt.Println("s[4]: ", s.GetBase(4))
+    fmt.Println("s[-1]: ", s.GetBase(s.Len - 1))
+    fmt.Print("s[:7]: ")
+    s.Subseq(0, 7).Print()
+    fmt.Println()
+    fmt.Print("s[7:] ")
+    s.Subseq(7, s.Len).Print()
+    fmt.Println()
+}
+
+func (kmerInt KmerInt) MinKey() MinKey {
+    var currMin MinInt = ^MinInt(0)
+    var currKey MinKey = ^MinKey(0)
+
+    var mask KmerInt = ^KmerInt(0)
+    mask >>= 32 - m
+
+    var i uint8
+    for i = 0; i <= k - m; i++ {
+        // we start with the last minimizer and work back - this makes masking easier and faster
+        possMin := MinInt((kmerInt | mask) >> i)
+        rcPossMin := possMin.revComp()
+
+        if possMin < currMin {
+            currMin = possMin
+            currKey = MinKey(k - m - i)
+        }
+        if rcPossMin < currMin {
+            currMin = rcPossMin
+            currKey = MinKey(k - m - i + 32)
+        }
+
+        mask <<= 2
+    }
+
+    return currKey
+}
+
+func (minPair MinPair) getMin() MinInt {
+    minKey := *(*MinKey)(unsafe.Pointer(&minPair[8]))
+    isRevComp := false
+    if minKey > 31 {
+        isRevComp = true
+        minKey -= 32
+    }
+    minInt := MinInt(*(*KmerInt)(unsafe.Pointer(&minPair)))
+    minInt <<= (64 - 2*k + uint8(minKey))
+    minInt >>= (64 - 2*m)
     
-    return subSeq
-}
-
-func (seq Seq) numExtraBits() uint8 {
-    return uint8(8 * uint64(len(seq.Bases)) - 2 * seq.Len)
-}
-
-func (seq Seq) getBase(i uint64) uint8 {
-    // the bit offset of this base in seq.Seq
-    bitOffset := i*2 + uint64(seq.numExtraBits())
-    // the byte index of seq.Seq in which our base exists
-    byteIndex := bitOffset / 8
-    var base uint8 = seq.Bases[byteIndex]
-    // the number of bits that must be shifted to move the base of interest into the least significant bits
-    bitsToShift := 6 - (bitOffset - 8*byteIndex)
-
-    return (base >> bitsToShift) | 3
+    if isRevComp {
+        return minInt.revComp()
+    } else {
+        return minInt
+    }
 }

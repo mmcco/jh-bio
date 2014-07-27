@@ -106,8 +106,8 @@ func (rg *RepeatGenome) WriteMins() error {
     writer := bufio.NewWriter(outfile)
     defer writer.Flush()
 
-    kmerBuf := make(TextSeq, rg.K, rg.K)
-    minBuf := make(TextSeq, rg.M, rg.M)
+    kmerBuf := make(TextSeq, k, k)
+    minBuf := make(TextSeq, m, m)
 
     for i, thisMin := range rg.SortedMins {
         fillMinBuf(minBuf, thisMin)
@@ -128,14 +128,11 @@ func (rg *RepeatGenome) WriteMins() error {
     return nil
 }
 
-func (kmerInt KmerInt) print(seqLen uint8) {
-    if seqLen > 31 {
-        panic("seqLen passed to printKmerInt() was too large")
-    }
+func (kmerInt KmerInt) print() {
     var i uint8
-    for i = 0; i < seqLen; i++ {
+    for i = 0; i < k; i++ {
         // this tricky bit arithmetic shifts the two bits of interests to the two rightmost positions, then selects them with the and statement
-        switch (kmerInt >> (2 * (seqLen - i - 1))) & 3 {
+        switch (kmerInt >> (2 * (k - i - 1))) & 3 {
         case 0:
             fmt.Print("a")
             break
@@ -154,14 +151,11 @@ func (kmerInt KmerInt) print(seqLen uint8) {
     }
 }
 
-func (minInt MinInt) print(seqLen uint8) {
-    if seqLen > 15 {
-        panic("seqLen passed to printMinInt() was too large")
-    }
+func (minInt MinInt) print() {
     var i uint8
-    for i = 0; i < seqLen; i++ {
+    for i = 0; i < m; i++ {
         // this tricky bit arithmetic shifts the two bits of interests to the two rightmost positions, then selects them with the and statement
-        switch (minInt >> (2 * (seqLen - i - 1))) & 3 {
+        switch (minInt >> (2 * (m - i - 1))) & 3 {
         case 0:
             fmt.Print("a")
             break
@@ -180,15 +174,12 @@ func (minInt MinInt) print(seqLen uint8) {
     }
 }
 
-func writeKmerInt(writer io.ByteWriter, seqInt KmerInt, seqLen uint8) error {
-    if seqLen > 31 {
-        panic("seqLen passed to writeKmerInt() was too large")
-    }
+func writeKmerInt(writer io.ByteWriter, seqInt KmerInt) error {
     var i uint8
     var err error
-    for i = 0; i < seqLen; i++ {
+    for i = 0; i < k; i++ {
         // this tricky bit arithmetic shifts the two bits of interests to the two rightmost positions, then selects them with the and statement
-        switch (seqInt >> (2 * (seqLen - i - 1))) & 3 {
+        switch (seqInt >> (2 * (k - i - 1))) & 3 {
         case 0:
             err = writer.WriteByte('a')
             break
@@ -211,15 +202,12 @@ func writeKmerInt(writer io.ByteWriter, seqInt KmerInt, seqLen uint8) error {
     return nil
 }
 
-func writeMinInt(writer io.ByteWriter, seqInt MinInt, seqLen uint8) error {
-    if seqLen > 15 {
-        panic("seqLen passed to writeMinInt() was too large")
-    }
+func writeMinInt(writer io.ByteWriter, seqInt MinInt) error {
     var i uint8
     var err error
-    for i = 0; i < seqLen; i++ {
+    for i = 0; i < m; i++ {
         // this tricky bit arithmetic shifts the two bits of interests to the two rightmost positions, then selects them with the and statement
-        switch (seqInt >> (2 * (seqLen - i - 1))) & 3 {
+        switch (seqInt >> (2 * (m - i - 1))) & 3 {
         case 0:
             err = writer.WriteByte('a')
             break
@@ -339,62 +327,6 @@ func (classNode *ClassNode) printTreeRec(indent int, printLeaves bool) {
     }
 }
 
-func (seq *Seq) Print() {
-    var numBases uint64 = uint64(len(seq.Bases))
-    basesInFirstByte := 1 + ((seq.Len - 1) % numBases)
-    var byteCopy byte = seq.Bases[0]
-    // we start by truncating the extra bits from the first byte and printing the rest
-    byteCopy <<= (4 - basesInFirstByte) * 2
-    var i uint64
-
-    for i = 0; i < basesInFirstByte; i++ {
-        // \xc0 is 11000000 in binary - it selects the first base
-        switch byteCopy & byte('\xc0') {
-        case 0:
-            fmt.Print("a")
-            break
-        case byte('\x40'):
-            fmt.Print("c")
-            break
-        case byte('\x80'):
-            fmt.Print("g")
-            break
-        case byte('\xc0'):
-            fmt.Print("t")
-            break
-        default:
-            panic("Seq.Print(): bad value in switch")
-        }
-        byteCopy <<= 2
-    }
-
-    // we then print the bases in the rest of the bytes
-    for i := 1; i < len(seq.Bases); i++ {
-        byteCopy = seq.Bases[i]
-
-        for j := 0; j < 4; j++ {
-            switch byteCopy & byte('\xc0') {
-            case 0:
-                fmt.Print("a")
-                break
-            case byte('\x40'):
-                fmt.Print("c")
-                break
-            case byte('\x80'):
-                fmt.Print("g")
-                break
-            case byte('\xc0'):
-                fmt.Print("t")
-                break
-            default:
-                panic("Seq.Print(): bad value in switch")
-            }
-
-            byteCopy <<= 2
-        }
-    }
-}
-
 func readSimSeqReads(filepath string) (error, Seqs) {
     err, lines := fileLines(filepath)
     if err != nil {
@@ -484,4 +416,63 @@ func GetReadSAMs(readsDirPath string) (error, []ReadSAM) {
     }
 
     return nil, readSAMs
+}
+
+func (rg *RepeatGenome) parseLib(filepath string) error {
+    err, lines := fileLines(filepath)
+    if err != nil {
+        return err
+    }
+
+    var minimizer MinInt
+    var minSet bool = false
+
+    for _, line := range lines {
+        if line[0] == '>' {
+            minimizer = TextSeq(bytes.TrimSpace(line[1:])).minInt()
+            if len(rg.SortedMins) > 0 && minimizer > rg.SortedMins[len(rg.SortedMins)-1] {
+                return IOError{"RepeatGenome.parseLib()", fmt.Errorf("minimizers not written in sorted order")}
+            }
+            rg.SortedMins = append(rg.SortedMins, minimizer)
+            rg.OffsetsToMin = append(rg.OffsetsToMin, uint64(len(rg.Kmers)))
+            minSet = true
+        } else if minSet {
+            return IOError{"RepeatGenome.parseLib()}", fmt.Errorf("missing or empty minimizer")}
+        } else {
+            fields := bytes.Fields(line)
+            kmerInt := TextSeq(fields[0]).kmerInt()
+            if len(rg.Kmers) > 0 && kmerInt > *(*KmerInt)(unsafe.Pointer(&rg.Kmers[len(rg.Kmers)-1][0])) {
+                return IOError{"RepeatGenome.parseLib()", fmt.Errorf("kmers not written in sorted order")}
+            }
+            lca := rg.ClassTree.ClassNodes[string(fields[1])]
+            var kmer Kmer
+            *(*KmerInt)(unsafe.Pointer(&kmer[0])) = kmerInt
+            *(*uint16)(unsafe.Pointer(&kmer[8])) = lca.ID
+            rg.Kmers = append(rg.Kmers, kmer)
+        }
+    }
+    return nil
+}
+
+func (seq Seq) Print() {
+    var i uint64
+    for i = 0; i < seq.Len; i++ {
+        thisByte := seq.Bytes[i/4]
+        switch (thisByte >> (6 - 2*(i%4))) & 3 {
+        case 0:
+            fmt.Print("a")
+            break
+        case 1:
+            fmt.Print("c")
+            break
+        case 2:
+            fmt.Print("g")
+            break
+        case 3:
+            fmt.Print("t")
+            break
+        default:
+            panic("Seq.Print(): logic error in switch statement")
+        }
+    }
 }
