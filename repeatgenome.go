@@ -13,6 +13,8 @@ package repeatgenome
 
    Premature commenting is the root of all evil, and I have sinned. Please read comments skeptically - they will eventually be audited.
 
+   We should probably just store minimizers fully - they're only 32 bits
+
    KmerInt.Minimize() logic could be changed now that minimizers are 32 bits
 
    Should a Seq's first field be a *byte to discard the extra two fields?
@@ -1176,6 +1178,8 @@ func (rg *RepeatGenome) getMinPairSlices() {
     runtime.GC()
 
     sort.Sort(fullKmers)
+    fmt.Println("raw kmer list sorted")
+    /*
     // make rg.MinPairs unique
     if len(fullKmers) > 0 {
         rg.FullKmers = append(rg.FullKmers, fullKmers[0])
@@ -1189,6 +1193,8 @@ func (rg *RepeatGenome) getMinPairSlices() {
             *(*uint16)(unsafe.Pointer(&rg.FullKmers[len(rg.FullKmers)-1])) = rg.ClassTree.getLCA(lastLCA, newNode).ID
         }
     }
+    */
+    rg.parallelFullKmers(fullKmers)
 
     fullKmers = nil
     runtime.GC()
@@ -1205,27 +1211,42 @@ func (rg *RepeatGenome) parallelFullKmers(fullKmers FullKmers) {
     numCPU := runtime.NumCPU()
     runtime.GOMAXPROCS(numCPU)
 
+    pairChan := make(chan ReducePair)
+    var wg sync.WaitGroup
+    wg.Add(numCPU)
+
     for i := 0; i < numCPU; i++ {
         go func() {
-            pair := <-pairChan
-            var reducedKmer FullKmer = pair.Set[0]
-            lcaID := *(*uint16)(unsafe.Pointer(&reducedKmer[9]))
-            currLCA := rg.ClassTree.NodesByID[lcaID]
+            for pair := range pairChan {
+                lcaID := *(*uint16)(unsafe.Pointer(&pair.Set[0][9]))
+                currLCA := rg.ClassTree.NodesByID[lcaID]
 
-            for i := 1; i < len(pair.Set); i++ {
-                lcaID = *(*uint16)()
-                currLCA = getLCA(currLCA, newNode)
+                for i := 1; i < len(pair.Set); i++ {
+                    lcaID = *(*uint16)(unsafe.Pointer(&pair.Set[i][9]))
+                    currLCA = rg.ClassTree.getLCA(currLCA, rg.ClassTree.NodesByID[lcaID])
+                }
+
+                *(*uint16)(unsafe.Pointer(pair.Loc)) = currLCA.ID
             }
+            wg.Done()
+        }()
     }
 
-    numKmers := uint64(len(fullKmers))
-    start, end uint64 = 0, 0
-    for end < numKmers {
-        start = end
-        end++
-        for end < numKmers && *(*uint64)(unsafe.Pointer(&fullKmers[end])) == *(*uint64)(unsafe.Pointer(&fullKmers[end+1])) {
+    go func() {
+        numKmers := uint64(len(fullKmers))
+        var start, end uint64 = 0, 0
+        for end < numKmers {
+            start = end
             end++
+            for end < numKmers && *(*uint64)(unsafe.Pointer(&fullKmers[end-1])) == *(*uint64)(unsafe.Pointer(&fullKmers[end])) {
+                end++
+            }
+            rg.FullKmers = append(rg.FullKmers, FullKmer{})
+            pairChan <- ReducePair{&rg.FullKmers[len(rg.FullKmers)-1], fullKmers[start : end]}
         }
-        kmerChan <- {rg.Kmers[len(rg.FullKmers)-1], fullKmers[start : end]}
-    }
+
+        close(pairChan)
+    }()
+
+    wg.Wait()
 }
