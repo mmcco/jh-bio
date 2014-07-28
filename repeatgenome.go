@@ -473,7 +473,7 @@ func Generate(genomeName string, k_arg, m_arg uint8, rgFlags Flags) (error, *Rep
             fmt.Println(err)
             os.Exit(1)
         }
-        rg.printSample(10)
+        rg.printSample(10, 5)
         err = rg.ReadFullKmers("dm3.mins")
         if err != nil {
             fmt.Println(err)

@@ -373,9 +373,11 @@ func (rg *RepeatGenome) ReadFullKmers(filepath string) error {
         return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
     }
     fmt.Println("expecting to read", comma(numKmers), "kmers")
+    fmt.Println()
 
     if len(rg.FullKmers) > 0 {
-        fmt.Println("WARNING: RepeatGenome.ReadFullKmers() overwriting RepeatGenome.FullKmers"); fmt.Println()
+        fmt.Println("!!! WARNING !!! RepeatGenome.ReadFullKmers() overwriting RepeatGenome.FullKmers")
+        fmt.Println()
     }
     rg.FullKmers = make(FullKmers, 0, numKmers)
 
@@ -383,8 +385,6 @@ func (rg *RepeatGenome) ReadFullKmers(filepath string) error {
     var i uint64
     for i = 0; i < numKmers; i++ {
         err = binary.Read(infile, binary.LittleEndian, &fullKmer)
-        fmt.Println(fullKmer)
-        if i > 30 { os.Exit(0) }
         if err != nil {
             return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
         }
@@ -398,11 +398,13 @@ func (rg *RepeatGenome) ReadFullKmers(filepath string) error {
     }
 
     if len(rg.SortedMins) > 0 {
-        fmt.Println("WARNING: RepeatGenome.ReadFullKmers() overwriting rg.SortedMins")
+        fmt.Println("!!! WARNING !!! RepeatGenome.ReadFullKmers() overwriting rg.SortedMins")
+        fmt.Println()
         rg.SortedMins = rg.SortedMins[:0]
     }
     if len(rg.OffsetsToMin) > 0 {
-        fmt.Println("WARNING: RepeatGenome.ReadFullKmers() overwriting rg.OffsetsToMin")
+        fmt.Println("!!! WARNING !!! RepeatGenome.ReadFullKmers() overwriting rg.OffsetsToMin")
+        fmt.Println()
         rg.OffsetsToMin = rg.OffsetsToMin[:0]
     }
 
@@ -432,6 +434,7 @@ func (rg *RepeatGenome) ReadFullKmers(filepath string) error {
 
     fmt.Println("read", comma(uint64(len(rg.FullKmers))), "kmers")
     fmt.Println("read", comma(uint64(len(rg.SortedMins))), "minimizers")
+    fmt.Println()
 
     return nil
 }
