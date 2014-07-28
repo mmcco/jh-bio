@@ -160,6 +160,8 @@ func minU64(a, b uint64) uint64 {
     }
 }
 
+// deprecated in favor of MinInt.canonicalRepr()
+/*
 func minMinInt(a, b MinInt) MinInt {
     if a < b {
         return a
@@ -167,7 +169,9 @@ func minMinInt(a, b MinInt) MinInt {
         return b
     }
 }
+*/
 
+// deprecated in favor of KmerInt.canonicalRepr()
 func minKmerInt(a, b KmerInt) KmerInt {
     if a < b {
         return a
@@ -272,7 +276,7 @@ func (rg *RepeatGenome) getMinIndices(minIndex uint64) (uint64, uint64) {
     startInd := rg.OffsetsToMin[minIndex]
     var endInd uint64
     if minIndex == uint64(len(rg.SortedMins)) - 1 {
-        endInd = uint64(len(rg.Kmers))
+        endInd = uint64(len(rg.FullKmers))
     } else {
         endInd = rg.OffsetsToMin[minIndex+1]
     }

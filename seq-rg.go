@@ -112,27 +112,11 @@ func (seq TextSeq) revCompMinInt() MinInt {
 func (kmerInt KmerInt) revComp() KmerInt {
     var revComp KmerInt = 0
     var i uint8
+    // use break statement instead of end condition to prevent wraparound
     for i = 0; i < k; i++ {
-        // should execute before every loop but the first
-        if i != 0 {
-            revComp <<= 2
-            kmerInt >>= 2
-        }
-        switch kmerInt & 3 {
-        case 0:
-            revComp |= 3
-            break
-        case 1:
-            revComp |= 2
-            break
-        case 2:
-            revComp |= 1
-            break
-        case 3:
-            break
-        default:
-            panic("bit manipulation logic error in KmerInt.revComp()")
-        }
+        revComp <<= 2
+        revComp |= (^kmerInt & 3)
+        kmerInt >>= 2
     }
     return revComp
 }
@@ -140,27 +124,11 @@ func (kmerInt KmerInt) revComp() KmerInt {
 func (minInt MinInt) revComp() MinInt {
     var revComp MinInt = 0
     var i uint8
+    // use break statement instead of end condition to prevent wraparound
     for i = 0; i < m; i++ {
-        // should execute before every loop but the first
-        if i != 0 {
-            revComp <<= 2
-            minInt >>= 2
-        }
-        switch minInt & 3 {
-        case 0:
-            revComp |= 3
-            break
-        case 1:
-            revComp |= 2
-            break
-        case 2:
-            revComp |= 1
-            break
-        case 3:
-            break
-        default:
-            panic("bit manipulation logic error in KmerInt.revComp()")
-        }
+        revComp <<= 2
+        revComp |= (^minInt & 3)
+        minInt >>= 2
     }
     return revComp
 }
@@ -170,24 +138,23 @@ func (kmerInt KmerInt) Minimize() MinInt {
         panic("KmerInt.Minimize(): m must be <= k and > 0")
     }
 
-    // stores the index of the leftmost base included in the minimizer
-    numExtraBases := 32 - k
-    numHangingBases := k - m
+    rcKmerInt := kmerInt.revComp()
+    // contains m consecutive 1 bits, right aligned (e.g. "0000011111111")
+    var mask KmerInt = (1 << (2*m)) - 1
     // despite being minimizers (and therefore expected to be MinInts), we make possMin and currMin KmerInts for ease of manipulation and then convert upon returning
     // initialize the current best minimizer candidate as MAX_INT
     currMin := ^KmerInt(0)
     // i is the index of the offset
     var i uint8
-    for i = 0; i <= numHangingBases; i++ {
-        // overflow off the first excluded base
-        possMin := kmerInt << (2 * (numExtraBases + i))
-        // return to proper alignment
-        possMin >>= 64 - 2*m
-        possMin = minKmerInt(possMin, possMin.revComp())
+    for i = 0; i <= k-m; i++ {
+        possMin := minKmerInt(mask & kmerInt, mask & rcKmerInt)
 
         if possMin < currMin {
             currMin = possMin
         }
+
+        kmerInt >>= 2
+        rcKmerInt >>= 2
     }
 
     return MinInt(currMin)
@@ -366,3 +333,40 @@ func (minPair MinPair) getMin() MinInt {
     }
 }
 */
+
+func (rg *RepeatGenome) getMinIndex(minInt MinInt) (bool, uint64) {
+    var i uint64 = 0
+    j := uint64(len(rg.SortedMins))
+
+    for i < j {
+        x := (i+j)/2
+
+        if minInt == rg.SortedMins[x] {
+            return true, x
+        } else if minInt < rg.SortedMins[x] {
+            j = x
+        } else {
+            i = x + 1
+        }
+    }
+
+    return false, 0
+}
+
+func (kmerInt KmerInt) canonicalRepr() KmerInt {
+    revComp := kmerInt.revComp()
+    if revComp < kmerInt {
+        return revComp
+    } else {
+        return kmerInt
+    }
+}
+
+func (minInt MinInt) canonicalRepr() MinInt {
+    revComp := minInt.revComp()
+    if revComp < minInt {
+        return revComp
+    } else {
+        return minInt
+    }
+}
