@@ -134,21 +134,20 @@ func (minInt MinInt) revComp() MinInt {
 }
 
 func (kmerInt KmerInt) Minimize() MinInt {
-    if m > k || m < 1 {
-        panic("KmerInt.Minimize(): m must be <= k and > 0")
-    }
-
     rcKmerInt := kmerInt.revComp()
-    // contains m consecutive 1 bits, right aligned (e.g. "0000011111111")
-    var mask KmerInt = (1 << (2*m)) - 1
     // despite being minimizers (and therefore expected to be MinInts), we make possMin and currMin KmerInts for ease of manipulation and then convert upon returning
     // initialize the current best minimizer candidate as MAX_INT
     currMin := ^KmerInt(0)
     // i is the index of the offset
+    var possMin KmerInt
     var i uint8
     for i = 0; i <= k-m; i++ {
-        possMin := minKmerInt(mask & kmerInt, mask & rcKmerInt)
+        possMin = mMask & kmerInt
+        if possMin < currMin {
+            currMin = possMin
+        }
 
+        possMin = mMask & rcKmerInt
         if possMin < currMin {
             currMin = possMin
         }
@@ -267,52 +266,36 @@ func (seq Seq) GetBase(i uint64) uint8 {
     return thisByte >> (6 - 2*(i%4))
 }
 
-func Debug() {
-    ts := TextSeq("tgaatatacgtagctctagctagcgcttatatg")
-    fmt.Println("ts:", ts)
-    s := ts.Seq()
-    fmt.Print("s: ")
-    s.Print()
-    fmt.Println()
-    fmt.Println("s[4]: ", s.GetBase(4))
-    fmt.Println("s[-1]: ", s.GetBase(s.Len - 1))
-    fmt.Print("s[:7]: ")
-    s.Subseq(0, 7).Print()
-    fmt.Println()
-    fmt.Print("s[7:] ")
-    s.Subseq(7, s.Len).Print()
-    fmt.Println()
-}
-
-/*
 func (kmerInt KmerInt) MinKey() MinKey {
-    var currMin MinInt = ^MinInt(0)
-    var currKey MinKey = ^MinKey(0)
-
-    var mask KmerInt = ^KmerInt(0)
-    mask >>= 32 - m
-
+    rcKmerInt := kmerInt.revComp()
+    numPossMins := k - m + 1
+    // despite being minimizers (and therefore expected to be MinInts), we make possMin and currMin KmerInts for ease of manipulation and then convert upon returning
+    // initialize the current best minimizer candidate as MAX_INT
+    currMin := ^KmerInt(0)
+    var currKey MinKey = 0
+    // i is the index of the offset
     var i uint8
-    for i = 0; i <= k - m; i++ {
-        // we start with the last minimizer and work back - this makes masking easier and faster
-        possMin := MinInt((kmerInt | mask) >> i)
-        rcPossMin := possMin.revComp()
+    for i = 0; i < numPossMins; i++ {
+        possMin := minKmerInt(mMask & kmerInt, mMask & rcKmerInt)
 
+        possMin = mMask & kmerInt
         if possMin < currMin {
             currMin = possMin
             currKey = MinKey(k - m - i)
         }
-        if rcPossMin < currMin {
-            currMin = rcPossMin
-            currKey = MinKey(k - m - i + 32)
+
+        possMin = mMask & rcKmerInt
+        if possMin < currMin {
+            currMin = possMin
+            currKey = MinKey(i)
         }
 
-        mask <<= 2
+        kmerInt >>= 2
+        rcKmerInt >>= 2
     }
 
     return currKey
 }
-*/
 
 /*
 func (minPair MinPair) getMin() MinInt {

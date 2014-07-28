@@ -74,6 +74,8 @@ import (
 
 // These variables are used ubiquitously, especially in performance-critical functions, so we grudgingly make them globals
 var k, m uint8
+// mask contains m consecutive 1 bits, right aligned (e.g. "0000011111111")
+var mMask KmerInt
 
 // a rudimentary way of deciding how many threads to allow, should eventually be improved
 var numCPU = runtime.NumCPU()
@@ -137,7 +139,6 @@ type RepeatGenome struct {
     // as discussed above, though, matches only contain 1D sequence indexes
     chroms         map[string](map[string]TextSeq)
     Kmers          Kmers
-    FullKmers      FullKmers
     // stores the offset of each minimizer's first kmer in RepeatGenome.Kmers - indexed by the minimizer's index in SortedMins
     OffsetsToMin   []uint64
     // stores the number of kmers that each minimizer is associated with
@@ -175,12 +176,12 @@ type KmerInts []KmerInt
 type MinInt uint32
 type MinInts []MinInt
 
-/*
 // Indexes the base of the associated kmer that is the starting index of its minimizer
 // If < 32, the minimizer is the positive strand representation
 // Otherwise, the minimizer is the reverse complement of kmer[minkey-32 : minkey+m-32]
 type MinKey uint8
 
+/*
 // Stores a KmerInt and a MinKey in that order
 type MinPair [9]byte
 type MinPairs []MinPair
@@ -195,9 +196,11 @@ type MinPairs []MinPair
 // the last two are the LCA ID
 type Kmer [10]byte
 
+/*
 // Like a Kmer, but with a MinInt between the KmerInt and the LCA ID.
 type FullKmer [14]byte
 type FullKmers []FullKmer
+*/
 
 // as with the Kmer type, each base is represented by two bits
 // any excess bits are the first bits of the first byte (seq is right-justified)
@@ -434,6 +437,7 @@ func Generate(genomeName string, k_arg, m_arg uint8, rgFlags Flags) (error, *Rep
     }
     k = k_arg
     m = m_arg
+    mMask = (1 << m) - 1
     fmt.Println("k =", k)
     fmt.Println("m =", m)
     fmt.Println()
@@ -893,20 +897,20 @@ KmerLoop:
 }
 */
 
-func (rg *RepeatGenome) getKmer(kmerInt KmerInt) *FullKmer {
+func (rg *RepeatGenome) getKmer(kmerInt KmerInt) *Kmer {
     minimizer := kmerInt.Minimize()
     minExists, minIndex := rg.getMinIndex(minimizer)
     if !minExists {
         return nil
     }
     
-    // simple binary search within the range of RepeatGenome.FullKmers that has this kmer's minimizer
+    // simple binary search within the range of RepeatGenome.Kmers that has this kmer's minimizer
     i, j := rg.getMinIndices(minIndex)
     for i < j {
         x := (j+i)/2
-        thisKmerInt := *(*KmerInt)(unsafe.Pointer(&rg.FullKmers[x][0]))
+        thisKmerInt := *(*KmerInt)(unsafe.Pointer(&rg.Kmers[x]))
         if thisKmerInt == kmerInt {
-            return &rg.FullKmers[x]
+            return &rg.Kmers[x]
         } else if thisKmerInt < kmerInt {
             i = x + 1
         } else {
@@ -917,12 +921,12 @@ func (rg *RepeatGenome) getKmer(kmerInt KmerInt) *FullKmer {
     return nil
 }
 
+/*
 type SeqAndClass struct {
     Seq   Seq
     Class *ClassNode
 }
 
-/*
 func (rg *RepeatGenome) kmerSeqFeed(seq TextSeq) chan uint64 {
     c := make(chan uint64)
 
@@ -957,9 +961,7 @@ type ReadResponse struct {
     ClassNode *ClassNode
 }
 
-// This function assumes that the Seqs in readSeqs do not contain 'n's.
-// The output reads of sequencing simulators will generally contain 'n's if the input reference genome does.
-// They must therefore be filtered upstream.
+// This function is a mess and needs cleaning up
 func (rg *RepeatGenome) ClassifyReads(readTextSeqs []TextSeq, responseChan chan ReadResponse) {
     var kmerSet map[KmerInt]bool
     var byteBuf TextSeq
@@ -1002,7 +1004,6 @@ ReadLoop:
             }
 
             if kmer != nil {
-                fillKmerBuf(byteBuf, kmerInt)
                 lcaID := *(*uint16)(unsafe.Pointer(&kmer[12]))
                 responseChan <- ReadResponse{read, rg.ClassTree.NodesByID[lcaID]}
                 // only use the first matched kmer
@@ -1079,9 +1080,9 @@ func (rg *RepeatGenome) ProcessReads() (error, chan ReadResponse) {
     return nil, rg.GetReadClassChan(reads)
 }
 
-type MinPairResponse struct {
-    ClassNodeID uint16
-    MinPairs MinPairs
+type ResponsePair struct {
+    Kmer Kmer
+    MinInt MinInt
 }
 
 // WARNING: Will return nil rather than empty slice in response.MinPairs

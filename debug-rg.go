@@ -66,3 +66,20 @@ func (rg *RepeatGenome) RunDebugTests() {
 
     rg.printSample(5, 5)
 }
+
+func DebugSeq() {
+    ts := TextSeq("tgaatatacgtagctctagctagcgcttatatg")
+    fmt.Println("ts:", ts)
+    s := ts.Seq()
+    fmt.Print("s: ")
+    s.Print()
+    fmt.Println()
+    fmt.Println("s[4]: ", s.GetBase(4))
+    fmt.Println("s[-1]: ", s.GetBase(s.Len - 1))
+    fmt.Print("s[:7]: ")
+    s.Subseq(0, 7).Print()
+    fmt.Println()
+    fmt.Print("s[7:] ")
+    s.Subseq(7, s.Len).Print()
+    fmt.Println()
+}
