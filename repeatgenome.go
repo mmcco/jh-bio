@@ -473,6 +473,7 @@ func Generate(genomeName string, k_arg, m_arg uint8, rgFlags Flags) (error, *Rep
             fmt.Println(err)
             os.Exit(1)
         }
+        rg.printSample(10)
         err = rg.ReadFullKmers("dm3.mins")
         if err != nil {
             fmt.Println(err)
@@ -1217,16 +1218,14 @@ func (rg *RepeatGenome) getMinPairSlices() {
     */
     rg.parallelFullKmers(fullKmers)
 
-    /*
+    fmt.Println(comma(uint64(len(rg.FullKmers))), "unique kmers processed")
+
     fullKmers = nil
     runtime.GC()
-    */
-
-    fmt.Println(comma(uint64(len(rg.FullKmers))), "unique kmers processed")
 }
 
 type ReducePair struct {
-    Loc *FullKmer
+    LcaPtr *uint16
     Set FullKmers
 }
 
@@ -1234,15 +1233,15 @@ func (rg *RepeatGenome) parallelFullKmers(fullKmers FullKmers) {
     numCPU := runtime.NumCPU()
     runtime.GOMAXPROCS(numCPU)
 
-    var numUniqs uint64
-    if len(fullKmers) == 0 {
-        numUniqs = 0
-    } else {
-        numUniqs = 1
-    }
-
-    for i := 1; i < len(fullKmers); i++ {
-        if *(*uint64)(unsafe.Pointer(&fullKmers[i-1])) != *(*uint64)(unsafe.Pointer(&fullKmers[i])) {
+    var numUniqs uint64 = 0
+    for i := range fullKmers {
+        if i == 0 {
+            numUniqs++;
+            continue
+        } 
+        lastKmerInt := *(*KmerInt)(unsafe.Pointer(&fullKmers[i-1]))
+        kmerInt := *(*KmerInt)(unsafe.Pointer(&fullKmers[i]))
+        if kmerInt != lastKmerInt {
             numUniqs++
         }
     }
@@ -1264,7 +1263,7 @@ func (rg *RepeatGenome) parallelFullKmers(fullKmers FullKmers) {
                     currLCA = rg.ClassTree.getLCA(currLCA, rg.ClassTree.NodesByID[lcaID])
                 }
 
-                *(*uint16)(unsafe.Pointer(&pair.Loc[12])) = currLCA.ID
+                *pair.LcaPtr = currLCA.ID
             }
             wg.Done()
         }()
@@ -1279,12 +1278,39 @@ func (rg *RepeatGenome) parallelFullKmers(fullKmers FullKmers) {
             for end < numKmers && *(*uint64)(unsafe.Pointer(&fullKmers[end-1])) == *(*uint64)(unsafe.Pointer(&fullKmers[end])) {
                 end++
             }
-            rg.FullKmers = append(rg.FullKmers, FullKmer{})
-            pairChan <- ReducePair{&rg.FullKmers[len(rg.FullKmers)-1], fullKmers[start : end]}
+            rg.FullKmers = append(rg.FullKmers, fullKmers[start])
+            lcaPtr := (*uint16)(unsafe.Pointer(&rg.FullKmers[len(rg.FullKmers)-1][12]))
+            pairChan <- ReducePair{lcaPtr, fullKmers[start : end]}
         }
 
         close(pairChan)
     }()
 
     wg.Wait()
+
+    // we first count how many unique minimizers there are for memory efficiency in the slice allocations
+    var lastMin MinInt
+    var minCount uint64 = 0
+    for _, fullKmer := range rg.FullKmers {
+        minInt := *(*MinInt)(unsafe.Pointer(&fullKmer[8]))
+        if minCount == 0 || minInt != lastMin {
+            lastMin = minInt
+            minCount++
+        }
+    }
+
+    fmt.Println("expecting", comma(minCount), "unique minimizers")
+
+    rg.OffsetsToMin = make([]uint64, 0, minCount)
+    rg.SortedMins = make(MinInts, 0, minCount)
+
+    for i, fullKmer := range rg.FullKmers {
+        minInt := *(*MinInt)(unsafe.Pointer(&fullKmer[8]))
+        if len(rg.SortedMins) == 0 || minInt != rg.SortedMins[len(rg.SortedMins)-1] {
+            rg.SortedMins = append(rg.SortedMins, minInt)
+            rg.OffsetsToMin = append(rg.OffsetsToMin, uint64(i))
+        }
+    }
+
+    fmt.Println("processed", comma(uint64(len(rg.SortedMins))), "unique minimizers")
 }

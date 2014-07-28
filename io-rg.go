@@ -8,7 +8,6 @@ import (
     "fmt"
     "io"
     "os"
-    "reflect"
     "sort"
     "strconv"
     "strings"
@@ -328,74 +327,72 @@ func (rg *RepeatGenome) WriteFullKmers(filepath string) error {
 }
 
 func (rg *RepeatGenome) ReadFullKmers(filepath string) error {
-    outfile, err := os.OpenFile(filepath, os.O_RDONLY, 0400)
+    infile, err := os.OpenFile(filepath, os.O_RDONLY, 0400)
     if err != nil {
         return IOError{"FullKmers.ReadFullKmers()", err}
     }
-    defer outfile.Close()
+    defer infile.Close()
 
-    headerBuf := make([]byte, 21, 21)
-    bytesRead, err := outfile.Read(headerBuf)
-    if err == io.EOF || bytesRead < len(headerBuf) {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("file too short")}
-    }
+    var thisMagic [3]byte
+    err = binary.Read(infile, binary.LittleEndian, &thisMagic)
     if err != nil {
         return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
     }
-    if !reflect.DeepEqual(magicBytes[:], headerBuf[:3]) {
+    if thisMagic != magicBytes {
         return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("magic bytes incorrect - are you sure this is the right file?")}
     }
 
-    k_, bytesRead := binary.Uvarint(headerBuf[3:4])
-    if bytesRead != 1 {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("error parsing k")}
+    var k_ uint8
+    err = binary.Read(infile, binary.LittleEndian, &k_)
+    if err != nil {
+        return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
     }
-    if uint8(k_) != k {
+    if k_ != k {
         return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("k value inconsistent with the supplied k value")}
     }
 
-    m_, bytesRead := binary.Uvarint(headerBuf[4:5])
-    if bytesRead != 1 {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("error parsing m")}
+    var m_ uint8
+    err = binary.Read(infile, binary.LittleEndian, &m_)
+    if err != nil {
+        return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
     }
-    if uint8(m_) != m {
+    if m_ != m {
         return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("m value inconsistent with the supplied m value")}
     }
 
-    numMins, bytesRead := binary.Uvarint(headerBuf[5:13])
-    if bytesRead != 8 {
-        return ParseError{"FullMins.ReadFullMins()", filepath, fmt.Errorf("error parsing numMins")}
+    var numMins uint64
+    err = binary.Read(infile, binary.LittleEndian, &numMins)
+    if err != nil {
+        return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
     }
     fmt.Println("expecting to read", comma(numMins), "mins")
 
-    numKmers, bytesRead := binary.Uvarint(headerBuf[13:21])
-    if bytesRead != 8 {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("error parsing numKmers")}
+    var numKmers uint64
+    err = binary.Read(infile, binary.LittleEndian, &numKmers)
+    if err != nil {
+        return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
     }
     fmt.Println("expecting to read", comma(numKmers), "kmers")
 
     if len(rg.FullKmers) > 0 {
         fmt.Println("WARNING: RepeatGenome.ReadFullKmers() overwriting RepeatGenome.FullKmers"); fmt.Println()
     }
-    rg.FullKmers = make(FullKmers, numKmers, numKmers)
+    rg.FullKmers = make(FullKmers, 0, numKmers)
 
-    kmerBuf := make([]byte, 14)
     var fullKmer FullKmer
     var i uint64
     for i = 0; i < numKmers; i++ {
-        bytesRead, err := outfile.Read(kmerBuf)
-        if err == io.EOF || bytesRead < len(kmerBuf) {
-            return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("fewer kmers supplied that specified in the minimizer header")}
-        }
+        err = binary.Read(infile, binary.LittleEndian, &fullKmer)
+        fmt.Println(fullKmer)
+        if i > 30 { os.Exit(0) }
         if err != nil {
             return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
         }
 
-        copy(fullKmer[:], kmerBuf)
         rg.FullKmers = append(rg.FullKmers, fullKmer)
     }
 
-    bytesRead, err = outfile.Read(kmerBuf)
+    err = binary.Read(infile, binary.LittleEndian, &fullKmer)
     if err != io.EOF {
         return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("extra data in file")}
     }

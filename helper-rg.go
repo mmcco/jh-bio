@@ -287,6 +287,11 @@ func (rg *RepeatGenome) getMinsKmers(minIndex uint64) []Kmer {
     return rg.Kmers[startInd : endInd]
 }
 
+func (rg *RepeatGenome) getMinsFullKmers(minIndex uint64) FullKmers {
+    startInd, endInd := rg.getMinIndices(minIndex)
+    return rg.FullKmers[startInd : endInd]
+}
+
 func ceilDiv_U64(a, b uint64) uint64 {
     if a == 0 {
         return 0
