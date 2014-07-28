@@ -468,6 +468,16 @@ func Generate(genomeName string, k_arg, m_arg uint8, rgFlags Flags) (error, *Rep
     */
     if rg.Flags.Minimize {
         rg.getMinPairSlices()
+        err := rg.WriteFullKmers("dm3.mins")
+        if err != nil {
+            fmt.Println(err)
+            os.Exit(1)
+        }
+        err = rg.ReadFullKmers("dm3.mins")
+        if err != nil {
+            fmt.Println(err)
+            os.Exit(1)
+        }
         os.Exit(0)
     }
 
@@ -1083,20 +1093,37 @@ func (rg *RepeatGenome) getMinPairs(match *Match) MinPairResponse {
     if len(matchSeq) < int(k) {
         return MinPairResponse{match.ClassNode.ID, nil}
     }
+    // includes kmers containing n's, which are ignored
     numKmers := end - start - k_ + 1
-    var minPairs MinPairs
 
+    // we only allocate the spaces needed, for memory efficiency
+    var actualNumKmers uint64 = 0
     var i uint64
+CountLoop:
+    for i = 0; i < numKmers; i++ {
+
+        var j int64
+        for j = int64(k_) - 1; j >= 0; j-- {
+            if matchSeq[i+uint64(j)] == 'n' {
+                i += uint64(j)
+                continue CountLoop
+            }
+        }
+
+        actualNumKmers++
+    }
+
+    minPairs := make(MinPairs, 0, actualNumKmers)
+
 KmerLoop:
     for i = 0; i < numKmers; i++ {
 
-        // loop logic uses manual condition to prevent unsigned int overflow
-        for j := k_ - 1; ; j-- {
-            if matchSeq[i+j] == 'n' {
+        var j int64
+        for j = int64(k_) - 1; j >= 0; j-- {
+            if matchSeq[i+uint64(j)] == 'n' {
                 i += uint64(j)
                 continue KmerLoop
             }
-            if j == 0 { break }
         }
 
         kmerInt := TextSeq(matchSeq[i : i+k_]).kmerInt()
@@ -1113,6 +1140,9 @@ KmerLoop:
 func (rg *RepeatGenome) getMinPairSlices() {
     numCPU := runtime.NumCPU()
     runtime.GOMAXPROCS(numCPU)
+
+    numNonuniqKmers := rg.numKmers()
+    fmt.Println("expecting", comma(numNonuniqKmers), "non-unique kmers")
 
     matchChan := make(chan *Match)
     go func() {
@@ -1135,7 +1165,8 @@ func (rg *RepeatGenome) getMinPairSlices() {
         }()
     }
 
-    var minPairResps []MinPairResponse
+    minPairResps := make([]MinPairResponse, numNonuniqKmers, numNonuniqKmers)
+
     go func() {
         for resp := range respChan {
             if resp.MinPairs != nil {
@@ -1164,10 +1195,8 @@ func (rg *RepeatGenome) getMinPairSlices() {
         resp.MinPairs = nil    // aid garbage collection
     }
 
-    /*
     minPairResps = nil
     runtime.GC()
-    */
 
     sort.Sort(fullKmers)
     fmt.Println("raw kmer list sorted")
@@ -1204,6 +1233,21 @@ type ReducePair struct {
 func (rg *RepeatGenome) parallelFullKmers(fullKmers FullKmers) {
     numCPU := runtime.NumCPU()
     runtime.GOMAXPROCS(numCPU)
+
+    var numUniqs uint64
+    if len(fullKmers) == 0 {
+        numUniqs = 0
+    } else {
+        numUniqs = 1
+    }
+
+    for i := 1; i < len(fullKmers); i++ {
+        if *(*uint64)(unsafe.Pointer(&fullKmers[i-1])) != *(*uint64)(unsafe.Pointer(&fullKmers[i])) {
+            numUniqs++
+        }
+    }
+
+    rg.FullKmers = make(FullKmers, 0, numUniqs)
 
     pairChan := make(chan ReducePair, 500)
     var wg sync.WaitGroup
