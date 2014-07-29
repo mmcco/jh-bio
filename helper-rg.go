@@ -203,6 +203,10 @@ func (kmers Kmers) Swap(i, j int) {
     kmers[i], kmers[j] = kmers[j], kmers[i]
 }
 
+func (kmers Kmers) Less(i, j int) bool {
+    return *(*KmerInt)(unsafe.Pointer(&kmers[i])) < *(*KmerInt)(unsafe.Pointer(&kmers[j]))
+}
+
 // sorts by both min and kmer - too slow
 /*
 func (kmers Kmers) Less(i, j int) bool {
@@ -220,10 +224,6 @@ func (kmers Kmers) Less(i, j int) bool {
     }
 }
 */
-
-func (kmers Kmers) Less(i, j int) bool {
-    return *(*KmerInt)(unsafe.Pointer(&kmers[i])) < *(*KmerInt)(unsafe.Pointer(&kmers[j]))
-}
 
 func (minInts MinInts) Len() int {
     return len(minInts)
