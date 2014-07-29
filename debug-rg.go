@@ -2,6 +2,7 @@ package repeatgenome
 
 import (
     "fmt"
+    "os"
     "unsafe"
 )
 
@@ -87,4 +88,21 @@ func DebugSeq() {
     fmt.Print("s[7:] ")
     s.Subseq(7, s.Len).Print()
     fmt.Println()
+}
+
+func (rg *RepeatGenome) testDataStructIntegrity() {
+
+    for i := 1; i < len(rg.SortedMins); i++ {
+        if rg.SortedMins[i] > rg.SortedMins[i-1] {
+            fmt.Println("ERROR: rg.SortedMins not sorted")
+            os.Exit(1)
+        }
+    }
+    fmt.Println("rg.SortedMins is indeed sorted")
+
+    if len(rg.SortedMins) != len(rg.MinCounts) || len(rg.MinCounts) != len(rg.MinOffsets) {
+        fmt.Println("ERROR: rg.SortedMins, rg.MinCounts, and rg.MinOffsets of inconsistent size")
+    } else {
+        fmt.Println("rg.SortedMins, rg.MinCounts, and rg.MinOffsets of compatible size")
+    }
 }

@@ -141,7 +141,7 @@ type RepeatGenome struct {
     chroms         map[string](map[string]TextSeq)
     Kmers          Kmers
     // stores the offset of each minimizer's first kmer in RepeatGenome.Kmers - indexed by the minimizer's index in SortedMins
-    MinOffsets   map[MinInt]uint64
+    MinOffsets     map[MinInt]uint64
     MinCounts      map[MinInt]uint32
     SortedMins     MinInts
     Matches        Matches
@@ -1241,6 +1241,18 @@ func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts map[MinInt]
         }
     }
 
+    /*
+    fmt.Println("(temp): len(rg.SortedMins) =", len(rg.SortedMins))
+    fmt.Println("(temp): len(locMap) =", len(locMap))
+    fmt.Println("(temp): numRawKmers =", numRawKmers)
+    for i, minInt := range rg.SortedMins[:10] {
+        fmt.Println(i, "=", locMap[minInt])
+    }
+    for i, minInt := range rg.SortedMins[len(rg.SortedMins)-10:] {
+        fmt.Println(i, "=", locMap[minInt])
+    }
+    */
+
     // we now populate the raw kmers list, filing each according to its minimizer
     rawKmers = make(Kmers, numRawKmers, numRawKmers)
     matchChan := make(chan *Match, 500)
@@ -1264,6 +1276,7 @@ func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts map[MinInt]
                 fmt.Print("offending minimizer: "); respPair.MinInt.print(); fmt.Println()
                 fmt.Println("offending index:", comma(uint64(locMap[respPair.MinInt])))
                 fmt.Println("len(rawKmers):", comma(uint64(len(rawKmers))))
+                os.Exit(0)
             }
             rawKmers[locMap[respPair.MinInt]] = respPair.Kmer
             locMap[respPair.MinInt]++
