@@ -7,11 +7,16 @@ import (
 
 func (rg *RepeatGenome) printSample(numMins, numKmers int) {
     for i := 0; i < len(rg.SortedMins); i += len(rg.SortedMins) / numMins {
-        rg.SortedMins[i].print(); fmt.Println()
-        for _, fullKmer := range rg.getMinsFullKmers(uint64(i))[:numKmers] {
+        thisMin := rg.SortedMins[i]
+        thisMin.print(); fmt.Println()
+        theseKmers := rg.getMinsKmers(thisMin)
+        if len(theseKmers) > numKmers {
+            theseKmers = theseKmers[:numKmers]
+        }
+        for _, kmer := range theseKmers {
             fmt.Print("\t")
-            (*(*KmerInt)(unsafe.Pointer(&fullKmer))).print()
-            lca_ID := *(*uint16)(unsafe.Pointer(&fullKmer[12]))
+            (*(*KmerInt)(unsafe.Pointer(&kmer))).print()
+            lca_ID := *(*uint16)(unsafe.Pointer(&kmer[8]))
             fmt.Printf("\t%s\n", rg.ClassTree.NodesByID[lca_ID].Name)
         }
     }

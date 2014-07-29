@@ -2,6 +2,7 @@ package repeatgenome
 
 import (
     "fmt"
+    "unsafe"
 )
 // General sequence-manipulation functions.
 
@@ -317,6 +318,8 @@ func (minPair MinPair) getMin() MinInt {
 }
 */
 
+// deprecated, and generally a dumb way of finding a min
+/*
 func (rg *RepeatGenome) getMinIndex(minInt MinInt) (bool, uint64) {
     var i uint64 = 0
     j := uint64(len(rg.SortedMins))
@@ -335,6 +338,7 @@ func (rg *RepeatGenome) getMinIndex(minInt MinInt) (bool, uint64) {
 
     return false, 0
 }
+*/
 
 func (kmerInt KmerInt) canonicalRepr() KmerInt {
     revComp := kmerInt.revComp()
@@ -352,4 +356,8 @@ func (minInt MinInt) canonicalRepr() MinInt {
     } else {
         return minInt
     }
+}
+
+func (kmer Kmer) Int() KmerInt {
+    return *(*KmerInt)(unsafe.Pointer(&kmer))
 }

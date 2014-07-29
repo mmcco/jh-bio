@@ -3,12 +3,12 @@ package repeatgenome
 import (
     "bufio"
     "bytes"
-    "encoding/binary"
+    //"encoding/binary"
     "encoding/json"
     "fmt"
     "io"
     "os"
-    "sort"
+    //"sort"
     "strconv"
     "strings"
     "unsafe"
@@ -113,13 +113,13 @@ func (rg *RepeatGenome) WriteMins() error {
     kmerBuf := make(TextSeq, k, k)
     minBuf := make(TextSeq, m, m)
 
-    for i, thisMin := range rg.SortedMins {
+    for _, thisMin := range rg.SortedMins {
         fillMinBuf(minBuf, thisMin)
         _, err = fmt.Fprintf(writer, ">%s\n", minBuf)
         if err != nil {
             return err
         }
-        for _, kmer := range rg.getMinsKmers(uint64(i)) {
+        for _, kmer := range rg.getMinsKmers(thisMin) {
             kmerSeqInt := *(*KmerInt)(unsafe.Pointer(&kmer[0]))
             lcaID := *(*uint16)(unsafe.Pointer(&kmer[8]))
             fillKmerBuf(kmerBuf, kmerSeqInt)
@@ -299,6 +299,7 @@ func (repeats *Repeats) Write(filename string) error {
     return nil
 }
 
+/*
 func (rg *RepeatGenome) WriteFullKmers(filepath string) error {
     outfile, err := os.Create(filepath)
     if err != nil {
@@ -402,17 +403,17 @@ func (rg *RepeatGenome) ReadFullKmers(filepath string) error {
         fmt.Println()
         rg.SortedMins = rg.SortedMins[:0]
     }
-    if len(rg.OffsetsToMin) > 0 {
-        fmt.Println("!!! WARNING !!! RepeatGenome.ReadFullKmers() overwriting rg.OffsetsToMin")
+    if len(rg.MinOffsets) > 0 {
+        fmt.Println("!!! WARNING !!! RepeatGenome.ReadFullKmers() overwriting rg.MinOffsets")
         fmt.Println()
-        rg.OffsetsToMin = rg.OffsetsToMin[:0]
+        rg.MinOffsets = rg.MinOffsets[:0]
     }
 
     for i, fullKmer := range rg.FullKmers {
         minInt := *(*MinInt)(unsafe.Pointer(&fullKmer[8]))
         if len(rg.SortedMins) == 0 || minInt != rg.SortedMins[len(rg.SortedMins)-1] {
             rg.SortedMins = append(rg.SortedMins, minInt)
-            rg.OffsetsToMin = append(rg.OffsetsToMin, uint64(i))
+            rg.MinOffsets = append(rg.MinOffsets, uint64(i))
         }
     }
 
@@ -420,12 +421,12 @@ func (rg *RepeatGenome) ReadFullKmers(filepath string) error {
         return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("minimizers not sorted")}
     }
 
-    for i, offset := range rg.OffsetsToMin {
+    for i, offset := range rg.MinOffsets {
         var end uint64
-        if i == len(rg.OffsetsToMin) - 1 {
+        if i == len(rg.MinOffsets) - 1 {
             end = uint64(len(rg.FullKmers))
         } else {
-            end = rg.OffsetsToMin[i+1]
+            end = rg.MinOffsets[i+1]
         }
         if !sort.IsSorted(rg.FullKmers[offset : end]) {
             return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("kmers not sorted")}
@@ -438,6 +439,7 @@ func (rg *RepeatGenome) ReadFullKmers(filepath string) error {
 
     return nil
 }
+*/
 
 func (repeat *Repeat) Print() {
     for j := range repeat.ClassList {
@@ -562,6 +564,7 @@ func GetReadSAMs(readsDirPath string) (error, []ReadSAM) {
     return nil, readSAMs
 }
 
+/*
 func (rg *RepeatGenome) parseLib(filepath string) error {
     err, lines := fileLines(filepath)
     if err != nil {
@@ -578,7 +581,7 @@ func (rg *RepeatGenome) parseLib(filepath string) error {
                 return IOError{"RepeatGenome.parseLib()", fmt.Errorf("minimizers not written in sorted order")}
             }
             rg.SortedMins = append(rg.SortedMins, minimizer)
-            rg.OffsetsToMin = append(rg.OffsetsToMin, uint64(len(rg.Kmers)))
+            rg.MinOffsets = append(rg.MinOffsets, uint64(len(rg.Kmers)))
             minSet = true
         } else if minSet {
             return IOError{"RepeatGenome.parseLib()}", fmt.Errorf("missing or empty minimizer")}
@@ -597,6 +600,7 @@ func (rg *RepeatGenome) parseLib(filepath string) error {
     }
     return nil
 }
+*/
 
 func (seq Seq) Print() {
     var i uint64
