@@ -17,13 +17,13 @@ package repeatgenome
 
    A lot of explicit variable types could be safely removed.
 
-   We could just store minimizers fully - they're only 32 bits.
-
    We really need a map to get min's indexes/offsets in O(1) time. getMin() currently does a binary search.
 
    KmerInt.Minimize() logic could be changed now that minimizers are 32 bits
 
-   Should a Seq's first field be a *byte to discard the extra two fields?
+   Should a Seq's first field be a *byte to discard the extra two fields? If not, we could probably use len() in Seq manipulations.
+
+   Should make a flag to prevent writing Kraken library.
 
    Should probably make a file solely for type defs.
 
@@ -90,7 +90,8 @@ type Config struct {
     Debug       bool
     CPUProfile  bool
     MemProfile  bool
-    Minimize    bool
+    WriteLib    bool
+    ForceGen    bool
 }
 
 // Match.SW_Score - Smith-Waterman score, describing the likeness to the repeat reference sequence
@@ -458,15 +459,33 @@ func New(config Config) (error, *RepeatGenome) {
     rg.getRepeats()
     rg.getClassTree()
 
-    if config.Minimize {
+    if config.ForceGen {
         rg.genKrakenLib()
-    } else {
-        err = rg.ReadKmers("dm3.mins")
+        err = rg.WriteKraken()
         if err != nil {
-            fmt.Println(err)
-            os.Exit(1)
+            return err, nil
+        }
+    } else {
+        minsFile, err := os.OpenFile(rg.Name + ".mins", os.O_RDONLY, 0400)
+        // implies the file already exists
+        if err == nil {
+            fmt.Println("Kraken library file exists - using contents\n")
+            err = rg.ReadKraken(minsFile)
+            if err != nil {
+                return IOError{"Kmers.ReadKraken()", err}, nil
+            }
+        } else if os.IsNotExist(err) {    // the case that there isn't a written file yet
+            fmt.Println("Kraken library file doesn't exist - generating library\n")
+            rg.genKrakenLib()
+            err = rg.WriteKraken()
+            if err != nil {
+                return err, nil
+            }
+        } else {    // otherwise we're dealing with a generic error of some sort
+            return err, nil
         }
     }
+
 
     if debug {
         rg.RunDebugTests()
@@ -994,7 +1013,7 @@ func (rg *RepeatGenome) genKrakenLib() {
     fmt.Println("generating rawKmers and locMap")
     rawKmers := rg.getRawKmers(numRawKmers, rawMinCounts)
     runtime.GC()    // manual memory clear
-    fmt.Println("raw kmers slice generated - len =", len(rawKmers))
+    fmt.Println("raw kmers slice generated - len =", comma(uint64(len(rawKmers))))
 
     if debug {
         rawKmers.checkIntegrity()

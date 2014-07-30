@@ -339,3 +339,9 @@ func (rg *RepeatGenome) populateMinOffsets() {
         }
     } 
 }
+
+func zero(byteSlice []byte) {
+    for i := range byteSlice {
+        byteSlice[i] = 0
+    }
+}
