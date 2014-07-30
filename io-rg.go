@@ -449,7 +449,7 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
     kmerBuf := make([]byte, len(Kmer{}))
 
     for i = 0; i < numKmers; i++ {
-        numBytes, err := infile.Read(kmerBuf)
+        numBytes, err := bufioReader.Read(kmerBuf)
         if err != nil {
             return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), err}
         }
