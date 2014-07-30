@@ -101,8 +101,12 @@ func (rg *RepeatGenome) checkIntegrity() {
             fmt.Println("ERROR: rg.SortedMins not sorted")
             os.Exit(1)
         }
+        if rg.SortedMins[i] == rg.SortedMins[i-1] {
+            fmt.Println("ERROR: rg.SortedMins contains multiple copies of a minimizer")
+            os.Exit(1)
+        }
     }
-    fmt.Println("rg.SortedMins is indeed sorted")
+    fmt.Println("rg.SortedMins is indeed sorted and unique")
 
     if len(rg.SortedMins) != len(rg.MinCounts) || len(rg.MinCounts) != len(rg.MinOffsets) {
         fmt.Println("ERROR: rg.SortedMins, rg.MinCounts, and rg.MinOffsets of inconsistent size")
