@@ -322,3 +322,20 @@ func ceilDiv_64(a, b int64) int64 {
 func ceilDiv(a, b int) int {
     return ((a - 1) / b) + 1
 }
+
+// assumes that rg.MinCounts and rg.SortedMins are populated
+func (rg *RepeatGenome) populateMinOffsets() {
+    if rg.MinOffsets != nil && len(rg.MinOffsets) > 0 {
+        fmt.Println("!!! WARNING !!! RepeatGenome.populateMinOffsets overwriting previous map")
+    }
+
+    rg.MinOffsets = make(map[MinInt]uint64, len(rg.SortedMins))
+    if len(rg.SortedMins) > 0 {
+        rg.MinOffsets[rg.SortedMins[0]] = 0
+        for i := 1; i < len(rg.SortedMins); i++ {
+            thisMin := rg.SortedMins[i]
+            lastMin := rg.SortedMins[i-1]
+            rg.MinOffsets[thisMin] = rg.MinOffsets[lastMin] + uint64(rg.MinCounts[lastMin])
+        }
+    } 
+}

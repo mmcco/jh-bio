@@ -3,6 +3,7 @@ package repeatgenome
 import (
     "fmt"
     "os"
+    "reflect"
     "unsafe"
 )
 
@@ -24,6 +25,9 @@ func (rg *RepeatGenome) printSample(numMins, numKmers int) {
 }
 
 func (rg *RepeatGenome) RunDebugTests() {
+    fmt.Println()
+    rg.checkIntegrity()
+
     fmt.Println()
     for k, v := range rg.chroms {
         for k_, v_ := range v {
@@ -90,10 +94,10 @@ func DebugSeq() {
     fmt.Println()
 }
 
-func (rg *RepeatGenome) testDataStructIntegrity() {
+func (rg *RepeatGenome) checkIntegrity() {
 
     for i := 1; i < len(rg.SortedMins); i++ {
-        if rg.SortedMins[i] > rg.SortedMins[i-1] {
+        if rg.SortedMins[i] <= rg.SortedMins[i-1] {
             fmt.Println("ERROR: rg.SortedMins not sorted")
             os.Exit(1)
         }
@@ -102,7 +106,42 @@ func (rg *RepeatGenome) testDataStructIntegrity() {
 
     if len(rg.SortedMins) != len(rg.MinCounts) || len(rg.MinCounts) != len(rg.MinOffsets) {
         fmt.Println("ERROR: rg.SortedMins, rg.MinCounts, and rg.MinOffsets of inconsistent size")
+        os.Exit(1)
     } else {
         fmt.Println("rg.SortedMins, rg.MinCounts, and rg.MinOffsets of compatible size")
+    }
+    
+    for _, minInt := range rg.SortedMins {
+        _, exists := rg.MinCounts[minInt]
+        if !exists {
+            fmt.Println("minimizer in rg.SortedMins absent from rg.MinCounts")
+            os.Exit(1)
+        }
+        _, exists = rg.MinOffsets[minInt]
+        if !exists {
+            fmt.Println("minimizer in rg.SortedMins absent from rg.MinOffsets")
+            os.Exit(1)
+        }
+    }
+    fmt.Println("all minimizers in rg.SortedMins present in rg.MinCounts and rg.MinOffsets")
+
+    for _, kmer := range rg.Kmers {
+        kmerInt := *(*KmerInt)(unsafe.Pointer(&kmer))
+        foundKmer := rg.getKmer(kmerInt)
+        if foundKmer == nil {
+            fmt.Print("ERROR: kmer "); kmerInt.print(); fmt.Println("not found by rg.getKmer()");
+        } else if *(*KmerInt)(unsafe.Pointer(foundKmer)) != kmerInt {
+            fmt.Print("ERROR: kmer "); kmerInt.print(); fmt.Println("caused a false positive return by rg.getKmer()");
+        }
+    }
+}
+
+func (rawKmers Kmers) checkIntegrity() {
+    var zeroKmer Kmer    // works because no raw kmer should have an LCA of zero, which represents root
+    for i, kmer := range rawKmers {
+        if reflect.DeepEqual(kmer, zeroKmer) {
+            fmt.Println("rawKmer at index", i, "not set")
+            os.Exit(1)
+        }
     }
 }

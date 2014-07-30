@@ -3,7 +3,7 @@ package repeatgenome
 import (
     "bufio"
     "bytes"
-    //"encoding/binary"
+    "encoding/binary"
     "encoding/json"
     "fmt"
     "io"
@@ -14,7 +14,7 @@ import (
     "unsafe"
 )
 
-var magicBytes [3]byte = [3]byte{'\x49', '\x47', '\x4d'}
+const magicVal int = 13377331
 
 // used only for recursive JSON writing
 type JSONNode struct {
@@ -299,147 +299,141 @@ func (repeats *Repeats) Write(filename string) error {
     return nil
 }
 
-/*
-func (rg *RepeatGenome) WriteFullKmers(filepath string) error {
+func (rg *RepeatGenome) WriteKmers(filepath string) error {
+    buf := make([]byte, 10)   // varints can occupy at most 10 bytes
     outfile, err := os.Create(filepath)
     if err != nil {
-        return IOError{"FullKmers.WriteFullKmers()", err}
+        return IOError{"FullKmers.WriteKmers()", err}
     }
     defer outfile.Close()
 
     // write magic bytes, k, m, numMins, and numKmers
-    for _, val := range [...]interface{}{magicBytes, k, m, uint64(len(rg.SortedMins)), uint64(len(rg.FullKmers))} {
-        err := binary.Write(outfile, binary.LittleEndian, val)
+    for _, val := range []interface{}{magicVal, int(k), int(m), len(rg.SortedMins), len(rg.Kmers)} {
+        numBytes := binary.PutUvarint(buf, uint64(val.(int)))
+        bytesWritten, err := outfile.Write(buf[:numBytes])
+        if bytesWritten != numBytes {
+            return IOError{"RepeatGenome.WriteKmers()", fmt.Errorf("did not write expected number of bytes")}
+        }
         if err != nil {
-            return ParseError{"RepeatGenome.WriteFullKmers()", filepath, err}
+            return IOError{"RepeatGenome.WriteKmers()", err}
         }
     }
 
-    fmt.Println("writing", comma(uint64(len(rg.FullKmers))), "kmers")
-
-    for _, fullKmer := range rg.FullKmers {
-        err := binary.Write(outfile, binary.LittleEndian, fullKmer)
+    // write mins in order
+    for _, minInt := range rg.SortedMins {
+        numBytes := binary.PutUvarint(buf, uint64(minInt))
+        bytesWritten, err := outfile.Write(buf[:numBytes])
+        if bytesWritten != numBytes {
+            return IOError{"RepeatGenome.WriteKmers()", fmt.Errorf("did not write expected number of bytes")}
+        }
         if err != nil {
-            return ParseError{"RepeatGenome.WriteFullKmers()", filepath, err}
+            return IOError{"RepeatGenome.WriteKmers()", err}
+        }
+    }
+
+    // write their counts in order
+    for _, minInt := range rg.SortedMins {
+        numBytes := binary.PutUvarint(buf, uint64(rg.MinCounts[minInt]))
+        bytesWritten, err := outfile.Write(buf[:numBytes])
+        if bytesWritten != numBytes {
+            return IOError{"RepeatGenome.WriteKmers()", fmt.Errorf("did not write expected number of bytes")}
+        }
+        if err != nil {
+            return IOError{"RepeatGenome.WriteKmers()", err}
+        }
+    }
+
+    // write kmers in order
+    for _, kmer := range rg.Kmers {
+        err := binary.Write(outfile, binary.LittleEndian, kmer)
+        if err != nil {
+            return IOError{"RepeatGenome.WriteKmers()", err}
         }
     }
 
     return nil
 }
 
-func (rg *RepeatGenome) ReadFullKmers(filepath string) error {
+// has a lot of error handling, but pretty simple logic
+func (rg *RepeatGenome) ReadKmers(filepath string) error {
     infile, err := os.OpenFile(filepath, os.O_RDONLY, 0400)
     if err != nil {
-        return IOError{"FullKmers.ReadFullKmers()", err}
+        return IOError{"Kmers.ReadKmers()", err}
     }
+    bufioReader := bufio.NewReader(infile)
     defer infile.Close()
 
-    var thisMagic [3]byte
-    err = binary.Read(infile, binary.LittleEndian, &thisMagic)
+    thisMagicVal, err := binary.ReadUvarint(bufioReader)
     if err != nil {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
+        return ParseError{"RepeatGenome.ReadKmers()", filepath, err}
     }
-    if thisMagic != magicBytes {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("magic bytes incorrect - are you sure this is the right file?")}
+    if int(thisMagicVal) != magicVal {
+        return ParseError{"RepeatGenome.ReadKmers()", filepath, fmt.Errorf("incorrect magic value - are you sure this is the right file?")}
     }
 
-    var k_ uint8
-    err = binary.Read(infile, binary.LittleEndian, &k_)
+    thisK, err := binary.ReadUvarint(bufioReader)
     if err != nil {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
+        return ParseError{"RepeatGenome.ReadKmers()", filepath, err}
     }
-    if k_ != k {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("k value inconsistent with the supplied k value")}
+    if uint8(thisK) != k {
+        return ParseError{"RepeatGenome.ReadKmers()", filepath, fmt.Errorf("incompatible k value - are you sure this is the right file?")}
     }
 
-    var m_ uint8
-    err = binary.Read(infile, binary.LittleEndian, &m_)
+    thisM, err := binary.ReadUvarint(bufioReader)
     if err != nil {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
+        return ParseError{"RepeatGenome.ReadKmers()", filepath, err}
     }
-    if m_ != m {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("m value inconsistent with the supplied m value")}
+    if uint8(thisM) != m {
+        return ParseError{"RepeatGenome.ReadKmers()", filepath, fmt.Errorf("incompatible m value - are you sure this is the right file?")}
     }
 
-    var numMins uint64
-    err = binary.Read(infile, binary.LittleEndian, &numMins)
+    numMins, err := binary.ReadUvarint(bufioReader)
     if err != nil {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
+        return ParseError{"RepeatGenome.ReadKmers()", filepath, err}
     }
-    fmt.Println("expecting to read", comma(numMins), "mins")
 
-    var numKmers uint64
-    err = binary.Read(infile, binary.LittleEndian, &numKmers)
+    numKmers, err := binary.ReadUvarint(bufioReader)
     if err != nil {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
+        return ParseError{"RepeatGenome.ReadKmers()", filepath, err}
     }
-    fmt.Println("expecting to read", comma(numKmers), "kmers")
-    fmt.Println()
 
-    if len(rg.FullKmers) > 0 {
-        fmt.Println("!!! WARNING !!! RepeatGenome.ReadFullKmers() overwriting RepeatGenome.FullKmers")
-        fmt.Println()
-    }
-    rg.FullKmers = make(FullKmers, 0, numKmers)
-
-    var fullKmer FullKmer
+    // populate rg.SortedMins
     var i uint64
-    for i = 0; i < numKmers; i++ {
-        err = binary.Read(infile, binary.LittleEndian, &fullKmer)
+    for i = 0; i < numMins; i++ {
+        minInt, err := binary.ReadUvarint(bufioReader)
         if err != nil {
-            return ParseError{"FullKmers.ReadFullKmers()", filepath, err}
+            return ParseError{"RepeatGenome.ReadKmers()", filepath, err}
+        }
+        rg.SortedMins = append(rg.SortedMins, MinInt(minInt))
+    }
+
+    // populate rg.MinCounts
+    for _, minInt := range rg.SortedMins {
+        minCount, err := binary.ReadUvarint(bufioReader)
+        if err != nil {
+            return ParseError{"RepeatGenome.ReadKmers()", filepath, err}
+        }
+        rg.MinCounts[minInt] = uint32(minCount)
+    }
+
+    // populate rg.Kmers
+    kmerBuf := make([]byte, unsafe.Sizeof(Kmer{}))
+    for i = 0; i < numKmers; i++ {
+        numBytes, err := infile.Read(kmerBuf)
+        if err != nil {
+            return ParseError{"RepeatGenome.ReadKmers()", filepath, err}
+        }
+        if numBytes != len(kmerBuf) {
+            return ParseError{"RepeatGenome.ReadKmers()", filepath, fmt.Errorf("too few kmer bytes read - file incorrectly written or corrupted")}
         }
 
-        rg.FullKmers = append(rg.FullKmers, fullKmer)
+        rg.Kmers = append(rg.Kmers, *(*Kmer)(unsafe.Pointer(&kmerBuf[0])))
     }
 
-    err = binary.Read(infile, binary.LittleEndian, &fullKmer)
-    if err != io.EOF {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("extra data in file")}
-    }
-
-    if len(rg.SortedMins) > 0 {
-        fmt.Println("!!! WARNING !!! RepeatGenome.ReadFullKmers() overwriting rg.SortedMins")
-        fmt.Println()
-        rg.SortedMins = rg.SortedMins[:0]
-    }
-    if len(rg.MinOffsets) > 0 {
-        fmt.Println("!!! WARNING !!! RepeatGenome.ReadFullKmers() overwriting rg.MinOffsets")
-        fmt.Println()
-        rg.MinOffsets = rg.MinOffsets[:0]
-    }
-
-    for i, fullKmer := range rg.FullKmers {
-        minInt := *(*MinInt)(unsafe.Pointer(&fullKmer[8]))
-        if len(rg.SortedMins) == 0 || minInt != rg.SortedMins[len(rg.SortedMins)-1] {
-            rg.SortedMins = append(rg.SortedMins, minInt)
-            rg.MinOffsets = append(rg.MinOffsets, uint64(i))
-        }
-    }
-
-    if !sort.IsSorted(rg.SortedMins) {
-        return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("minimizers not sorted")}
-    }
-
-    for i, offset := range rg.MinOffsets {
-        var end uint64
-        if i == len(rg.MinOffsets) - 1 {
-            end = uint64(len(rg.FullKmers))
-        } else {
-            end = rg.MinOffsets[i+1]
-        }
-        if !sort.IsSorted(rg.FullKmers[offset : end]) {
-            return ParseError{"FullKmers.ReadFullKmers()", filepath, fmt.Errorf("kmers not sorted")}
-        }
-    }
-
-    fmt.Println("read", comma(uint64(len(rg.FullKmers))), "kmers")
-    fmt.Println("read", comma(uint64(len(rg.SortedMins))), "minimizers")
-    fmt.Println()
+    rg.populateMinOffsets()
 
     return nil
 }
-*/
 
 func (repeat *Repeat) Print() {
     for j := range repeat.ClassList {
@@ -563,44 +557,6 @@ func GetReadSAMs(readsDirPath string) (error, []ReadSAM) {
 
     return nil, readSAMs
 }
-
-/*
-func (rg *RepeatGenome) parseLib(filepath string) error {
-    err, lines := fileLines(filepath)
-    if err != nil {
-        return err
-    }
-
-    var minimizer MinInt
-    var minSet bool = false
-
-    for _, line := range lines {
-        if line[0] == '>' {
-            minimizer = TextSeq(bytes.TrimSpace(line[1:])).minInt()
-            if len(rg.SortedMins) > 0 && minimizer > rg.SortedMins[len(rg.SortedMins)-1] {
-                return IOError{"RepeatGenome.parseLib()", fmt.Errorf("minimizers not written in sorted order")}
-            }
-            rg.SortedMins = append(rg.SortedMins, minimizer)
-            rg.MinOffsets = append(rg.MinOffsets, uint64(len(rg.Kmers)))
-            minSet = true
-        } else if minSet {
-            return IOError{"RepeatGenome.parseLib()}", fmt.Errorf("missing or empty minimizer")}
-        } else {
-            fields := bytes.Fields(line)
-            kmerInt := TextSeq(fields[0]).kmerInt()
-            if len(rg.Kmers) > 0 && kmerInt > *(*KmerInt)(unsafe.Pointer(&rg.Kmers[len(rg.Kmers)-1][0])) {
-                return IOError{"RepeatGenome.parseLib()", fmt.Errorf("kmers not written in sorted order")}
-            }
-            lca := rg.ClassTree.ClassNodes[string(fields[1])]
-            var kmer Kmer
-            *(*KmerInt)(unsafe.Pointer(&kmer[0])) = kmerInt
-            *(*uint16)(unsafe.Pointer(&kmer[8])) = lca.ID
-            rg.Kmers = append(rg.Kmers, kmer)
-        }
-    }
-    return nil
-}
-*/
 
 func (seq Seq) Print() {
     var i uint64
