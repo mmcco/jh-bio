@@ -285,17 +285,16 @@ func fillMinBuf(slice TextSeq, seqInt MinInt) {
     }
 }
 
-func (repeats *Repeats) Write(filename string) error {
+func (repeats Repeats) Write(filename string) error {
     outfile, err := os.Create(filename)
     if err != nil {
         return IOError{"Repeats.Write()", err}
     }
     defer outfile.Close()
 
-    for i := range *repeats {
-        if int((*repeats)[i].ID) == i {
-            fmt.Fprintf(outfile, "%d %s\n", (*repeats)[i].ID, (*repeats)[i].Name)
-        }
+    fmt.Fprintln(outfile, "ID\tName\tNumInstances\tDepth")
+    for _, repeat := range repeats {
+        fmt.Fprintf(outfile, "%d\t%s\t%d\t%d\n", repeat.ID, repeat.Name, len(repeat.Instances), len(repeat.ClassList))
     }
     return nil
 }
