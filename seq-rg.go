@@ -58,80 +58,26 @@ func (seq TextSeq) minInt() MinInt {
     return minInt
 }
 
-func (seq TextSeq) revCompKmerInt() KmerInt {
-    if len(seq) < 1 || len(seq) > 31 {
-        panic("TextSeq.revCompKmerInt() can only int-ize sequences where 0 < length < 32")
-    }
-    var kmerInt KmerInt = 0
-    for i := range seq {
-        kmerInt = kmerInt << 2
-        switch seq[len(seq)-(i+1)] {
-        case 'a':
-            kmerInt |= 3
-            break
-        case 'c':
-            kmerInt |= 2
-            break
-        case 'g':
-            kmerInt |= 1
-            break
-        case 't':
-            break
-        default:
-            panic(fmt.Errorf("byte other than 'a', 'c', 'g', or 't' passed to TextSeq.revCompKmerInt(): %c", seq[i]))
-        }
-    }
-    return kmerInt
-}
-
-func (seq TextSeq) revCompMinInt() MinInt {
-    if len(seq) < 1 || len(seq) > 15 {
-        panic("TextSeq.revCompMinInt() can only int-ize sequences where 0 < length < 15")
-    }
-    var minInt MinInt = 0
-    for i := range seq {
-        minInt = minInt << 2
-        switch seq[len(seq)-(i+1)] {
-        case 'a':
-            minInt |= 3
-            break
-        case 'c':
-            minInt |= 2
-            break
-        case 'g':
-            minInt |= 1
-            break
-        case 't':
-            break
-        default:
-            panic(fmt.Errorf("byte other than 'a', 'c', 'g', or 't' passed to TextSeq.revCompMinInt(): %c", seq[i]))
-        }
-    }
-    return minInt
-}
-
 func (kmerInt KmerInt) revComp() KmerInt {
-    var revComp KmerInt = 0
+    var revComp KmerInt
     var i uint8
-    // use break statement instead of end condition to prevent wraparound
     for i = 0; i < k; i++ {
         revComp <<= 2
-        revComp |= (^kmerInt & 3)
+        revComp |= kmerInt & 3
         kmerInt >>= 2
     }
-    return revComp
+    return revComp ^ kMask
 }
 
 func (minInt MinInt) revComp() MinInt {
-    var revComp MinInt = 0
+    var revComp MinInt
     var i uint8
-    // use break statement instead of end condition to prevent wraparound
     for i = 0; i < m; i++ {
         revComp <<= 2
-        revComp |= (^minInt & 3)
+        revComp |= minInt & 3
         minInt >>= 2
     }
-    return revComp
+    return revComp ^ MinInt(mMask)
 }
 
 func (kmerInt KmerInt) Minimize() MinInt {
@@ -297,48 +243,6 @@ func (kmerInt KmerInt) MinKey() MinKey {
 
     return currKey
 }
-
-/*
-func (minPair MinPair) getMin() MinInt {
-    minKey := *(*MinKey)(unsafe.Pointer(&minPair[8]))
-    isRevComp := false
-    if minKey > 31 {
-        isRevComp = true
-        minKey -= 32
-    }
-    minInt := MinInt(*(*KmerInt)(unsafe.Pointer(&minPair)))
-    minInt <<= (64 - 2*k + uint8(minKey))
-    minInt >>= (64 - 2*m)
-    
-    if isRevComp {
-        return minInt.revComp()
-    } else {
-        return minInt
-    }
-}
-*/
-
-// deprecated, and generally a dumb way of finding a min
-/*
-func (rg *RepeatGenome) getMinIndex(minInt MinInt) (bool, uint64) {
-    var i uint64 = 0
-    j := uint64(len(rg.SortedMins))
-
-    for i < j {
-        x := (i+j)/2
-
-        if minInt == rg.SortedMins[x] {
-            return true, x
-        } else if minInt < rg.SortedMins[x] {
-            j = x
-        } else {
-            i = x + 1
-        }
-    }
-
-    return false, 0
-}
-*/
 
 func (kmerInt KmerInt) canonicalRepr() KmerInt {
     revComp := kmerInt.revComp()

@@ -134,6 +134,7 @@ func (rg *RepeatGenome) checkIntegrity() {
         foundKmer := rg.getKmer(kmerInt)
         if foundKmer == nil {
             fmt.Print("ERROR: kmer "); kmerInt.print(); fmt.Println("not found by rg.getKmer()");
+            os.Exit(1)
         } else if *(*KmerInt)(unsafe.Pointer(foundKmer)) != kmerInt {
             fmt.Print("ERROR: kmer "); kmerInt.print(); fmt.Println("caused a false positive return by rg.getKmer()");
         }

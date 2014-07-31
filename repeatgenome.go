@@ -18,8 +18,8 @@ import (
 
 // These variables are used ubiquitously, especially in performance-critical functions, so we grudgingly make them globals
 var k, m uint8
-// mask contains m consecutive 1 bits, right aligned (e.g. "0000011111111")
-var mMask KmerInt
+// masks contain k and m consecutive right aligned 1 bits respectively (e.g. "0000011111111")
+var kMask, mMask KmerInt
 var debug bool
 
 // a rudimentary way of deciding how many threads to allow, should eventually be improved
@@ -368,6 +368,7 @@ func New(config Config) (error, *RepeatGenome) {
     }
     k = config.K
     m = config.M
+    kMask = (1 << (2*k)) - 1
     mMask = (1 << (2*m)) - 1
     fmt.Println("k =", k)
     fmt.Println("m =", m)
