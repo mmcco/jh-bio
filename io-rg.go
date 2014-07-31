@@ -321,7 +321,6 @@ func (rg *RepeatGenome) WriteKraken() error {
     }
 
     // write mins in order
-    fmt.Println("writing", len(rg.SortedMins), "mins")
     for _, minInt := range rg.SortedMins {
         numBytes := binary.PutUvarint(buf, uint64(minInt))
         bytesWritten, err := outfile.Write(buf[:numBytes])
@@ -334,7 +333,6 @@ func (rg *RepeatGenome) WriteKraken() error {
     }
 
     // write their counts in order
-    fmt.Println("writing", len(rg.MinCounts), "minCounts")
     for _, minInt := range rg.SortedMins {
         numBytes := binary.PutUvarint(buf, uint64(rg.MinCounts[minInt]))
         bytesWritten, err := outfile.Write(buf[:numBytes])
@@ -349,7 +347,6 @@ func (rg *RepeatGenome) WriteKraken() error {
     // write kmers in order
     kmerSize := len(Kmer{})
     var kmerBuf []byte
-    fmt.Println("writing", len(rg.Kmers), "kmers")
     for _, kmer := range rg.Kmers {
         kmerBuf = kmer[:]
         numBytes, err := outfile.Write(kmerBuf)
@@ -386,7 +383,6 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
     if uint8(thisK) != k {
         return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), fmt.Errorf("incompatible k value - are you sure this is the right file?")}
     }
-    fmt.Println("read k =", thisK)
 
     // check M
     thisM, err := binary.ReadUvarint(bufioReader)
@@ -396,21 +392,18 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
     if uint8(thisM) != m {
         return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), fmt.Errorf("incompatible m value - are you sure this is the right file?")}
     }
-    fmt.Println("read m =", thisM)
 
     // get number of minimizers
     numMins, err := binary.ReadUvarint(bufioReader)
     if err != nil {
         return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), err}
     }
-    fmt.Println("read numMins =", numMins)
 
     // get number of kmers
     numKmers, err := binary.ReadUvarint(bufioReader)
     if err != nil {
         return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), err}
     }
-    fmt.Println("read numKmers =", numKmers)
 
     // populate rg.SortedMins
     if len(rg.SortedMins) > 0 {
@@ -449,7 +442,7 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
     kmerBuf := make([]byte, len(Kmer{}))
 
     for i = 0; i < numKmers; i++ {
-        numBytes, err := bufioReader.Read(kmerBuf)
+        numBytes, err := io.ReadFull(bufioReader, kmerBuf)
         if err != nil {
             return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), err}
         }

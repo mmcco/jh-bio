@@ -1,63 +1,5 @@
 package repeatgenome
 
-/*
-   WARNING!!! This program is currently under development and may be buggy or broken.
-
-   A barebones (at the moment) Go script for parsing and minimizing RepeatMasker output files alongside FASTA reference genomes.
-
-   This script expects there to be a subdirectory of the current directory named after the reference genome used (e.g. "dm3") that contains the following files:
-       * a RepeatMasker library containing:
-           - the match library (e.g. "dm3.fa.out")
-           - the alignment information (e.g. "dm3.fa.align")
-       * one or more reference genome files in FASTA format with the suffix ".fa"
-
-   Premature commenting is the root of all evil, and I have sinned. Please read comments skeptically - they will eventually be audited.
-
-   Functions for pointer accesses?
-
-   A lot of explicit variable types could be safely removed.
-
-   We really need a map to get min's indexes/offsets in O(1) time. getMin() currently does a binary search.
-
-   KmerInt.Minimize() logic could be changed now that minimizers are 32 bits
-
-   Should a Seq's first field be a *byte to discard the extra two fields? If not, we could probably use len() in Seq manipulations.
-
-   Should make a flag to prevent writing Kraken library.
-
-   Should probably make a file solely for type defs.
-
-   Reads are currently kept in TextSeq form until the bitter end because, with Go's referenced based slices, there's no compelling reason not to, and because they're easier (and probably faster) to manipulate than Seqs. This may change at some point, though.
-
-   If a minimizer is associated with a single repeat type, can we use that heuristically?
-
-   Error handling should be updated with a custom ParseError type - panics should be removed, excepting performance-cricial sequence manipulation functions
-
-   Should consider splitting at hyphenated class names like TcMar-Tc1
-
-   The concurrent read-kmer generator could be reintroduced using a select statement.
-
-   Should probably restrict activity of chans with directionals
-
-   It would make sense to discard kmers associated with ClassNodes greater than a certain size.
-
-   Kmer counting should be re-added eventually - it's currently excluded for performance reasons because we aren't using it.
-
-   We should test a version that doesn't cache minimizers, as that seems to be a needless bottleneck. It could also be conditional on the number of CPUs available.
-
-   All sequences containing Ns are currently ignored.
-
-   We should consider taking end minimizers once the code base is more mature.
-
-   We should also review how to deal with m <= len(match) < k.
-
-   For caching efficiency, we should change the minimizer data structure to a map-indexed 1D slice of Kmers (not *Kmers). (This technique originated in Kraken.)
-
-   Int sizes should be reviewed for memory efficiency.
-
-   The sole command line argument is the name of the reference genome (e.g. "dm3").
-*/
-
 import (
     "bytes"
     "fmt"
@@ -94,25 +36,27 @@ type Config struct {
     ForceGen    bool
 }
 
-// Match.SW_Score - Smith-Waterman score, describing the likeness to the repeat reference sequence
-// Match.PercDiv - "% substitutions in matching region compared to the consensus" - RepeatMasker docs
-// Match.PercDel - "% of bases opposite a gap in the query sequence (deleted bp)" - RepeatMasker docs
-// Match.PercIns - "% of bases opposite a gap in the repeat consensus (inserted bp)" - RepeatMasker docs
-// Match.SeqName -  the reference genome file this match came from (typically the chromosome)
-// Match.SeqStart -  the starting index (inclusive) in the reference genome
-// Match.SeqEnd -  the ending index (exclusive) in the reference genome
-// Match.SeqRemains - the number of bases past the end of the match in the relevant reference seqence
-// Match.IsRevComp -  the match may be for the complement of the reference sequence
-// Match.RepeatClass - the repeat's full ancestry, including its repeat class and repeat name (which are listed separately in the RepeatMasker output file)
-// Match.RepeatStart-  the starting index in the repeat consensus sequence
-// Match.RepeatEnd -  the ending sequence (exclusive) in the consensus repeat  sequence
-// Match.RepeatRemains - the number of bases past the end of the match in the consensus repeat sequence
-// Match.InsertionID - a numerical ID for the repeat type (starts at 1)
-//
-//     below are not in parsed data file
-// Match.RepeatName - simply repeatClass concatenated - used for printing and map indexing
-// Match.ClassNode - pointer to corresponding ClassNode in RepeatGenome.ClassTree
-// Match.Repeat - pointer to corresponding Repeat struct in RepeatGenome.Repeats
+/*
+   Match.SW_Score - Smith-Waterman score, describing the likeness to the repeat reference sequence
+   Match.PercDiv - "% substitutions in matching region compared to the consensus" - RepeatMasker docs
+   Match.PercDel - "% of bases opposite a gap in the query sequence (deleted bp)" - RepeatMasker docs
+   Match.PercIns - "% of bases opposite a gap in the repeat consensus (inserted bp)" - RepeatMasker docs
+   Match.SeqName -  the reference genome file this match came from (typically the chromosome)
+   Match.SeqStart -  the starting index (inclusive) in the reference genome
+   Match.SeqEnd -  the ending index (exclusive) in the reference genome
+   Match.SeqRemains - the number of bases past the end of the match in the relevant reference seqence
+   Match.IsRevComp -  the match may be for the complement of the reference sequence
+   Match.RepeatClass - the repeat's full ancestry, including its repeat class and repeat name (which are listed separately in the RepeatMasker output file)
+   Match.RepeatStart-  the starting index in the repeat consensus sequence
+   Match.RepeatEnd -  the ending sequence (exclusive) in the consensus repeat  sequence
+   Match.RepeatRemains - the number of bases past the end of the match in the consensus repeat sequence
+   Match.InsertionID - a numerical ID for the repeat type (starts at 1)
+  
+       below are not in parsed data file
+   Match.RepeatName - simply repeatClass concatenated - used for printing and map indexing
+   Match.ClassNode - pointer to corresponding ClassNode in RepeatGenome.ClassTree
+   Match.Repeat - pointer to corresponding Repeat struct in RepeatGenome.Repeats
+*/
 type Match struct {
     SW_Score    int32
     PercDiv     float64
