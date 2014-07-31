@@ -17,6 +17,8 @@ import (
 var k, m uint8
 // masks contain k and m consecutive right aligned 1 bits respectively (e.g. "0000011111111")
 var kMask, mMask KmerInt
+// the size of a slice that can be indexed by any minimizer
+var minSliceSize uint64
 var debug bool
 
 // a rudimentary way of deciding how many threads to allow, should eventually be improved
@@ -86,8 +88,9 @@ type RepeatGenome struct {
     chroms         Chroms
     Kmers          Kmers
     // stores the offset of each minimizer's first kmer in RepeatGenome.Kmers - indexed by the minimizer's index in SortedMins
-    MinOffsets     map[MinInt]uint64
-    MinCounts      map[MinInt]uint32
+    // a negative value indicates that the minimizer does not exist
+    MinOffsets     []int64
+    MinCounts      []uint32
     SortedMins     MinInts
     Matches        Matches
     ClassTree      ClassTree
@@ -367,11 +370,11 @@ func New(config Config) (error, *RepeatGenome) {
     }
     k = config.K
     m = config.M
+    minSliceSize = 1 << (2*m)
     kMask = (1 << (2*k)) - 1
     mMask = (1 << (2*m)) - 1
     fmt.Println("k =", k)
     fmt.Println("m =", m)
-    fmt.Println()
 
     runtime.GOMAXPROCS(numCPU)
 
@@ -413,7 +416,7 @@ func New(config Config) (error, *RepeatGenome) {
         minsFile, err := os.OpenFile(rg.Name + ".mins", os.O_RDONLY, 0400)
         // implies the file already exists
         if err == nil {
-            fmt.Println("Kraken library file exists - using contents\n")
+            fmt.Println("\nKraken library file exists - using contents")
             err = rg.ReadKraken(minsFile)
             if err != nil {
                 return IOError{"Kmers.ReadKraken()", err}, nil

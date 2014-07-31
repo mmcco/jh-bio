@@ -479,7 +479,7 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
     if rg.MinCounts != nil && len(rg.MinCounts) > 0 {
         fmt.Println("!!! WARNING !!! RepeatGenome.ReadKraken() overwriting RepeatGenome.MinCounts")
     }
-    rg.MinCounts = make(map[MinInt]uint32, len(rg.SortedMins))
+    rg.MinCounts = make([]uint32, minSliceSize, minSliceSize)
 
     for _, minInt := range rg.SortedMins {
         minCount, err := binary.ReadUvarint(bufioReader)

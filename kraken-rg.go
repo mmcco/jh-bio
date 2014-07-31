@@ -19,20 +19,20 @@ func (classTree *ClassTree) getLCA(cnA, cnB *ClassNode) *ClassNode {
     return classTree.Root
 }
 
-func (rg *RepeatGenome) getKmer(kmerInt KmerInt) *Kmer {
+func (rg *RepeatGenome) getKmerLCA(kmerInt KmerInt) *ClassNode {
     minimizer := kmerInt.Minimize()
     
     // simple binary search within the range of RepeatGenome.Kmers that has this kmer's minimizer
-    i, exists := rg.MinOffsets[minimizer]
-    if !exists {
+    i := rg.MinOffsets[minimizer]
+    if i < 0 {
         return nil
     }
-    j := i + uint64(rg.MinCounts[minimizer])
+    j := i + int64(rg.MinCounts[minimizer])
     for i < j {
         x := (j+i)/2
         thisKmerInt := *(*KmerInt)(unsafe.Pointer(&rg.Kmers[x]))
         if thisKmerInt == kmerInt {
-            return &rg.Kmers[x]
+            return rg.ClassTree.NodesByID[*(*uint16)(unsafe.Pointer(&rg.Kmers[x][8]))]    // get kmer's LCA ID and return the corresponding ClassNode
         } else if thisKmerInt < kmerInt {
             i = x + 1
         } else {
@@ -115,7 +115,7 @@ func (rg *RepeatGenome) getMatchKmers(matchChan chan *Match, respChan chan Respo
 }
 
 // we first count the number of non-unique kmers and the number of non-unique minimizers associated with each kmer
-func (rg *RepeatGenome) krakenFirstPass() (numRawKmers uint64, rawMinCounts map[MinInt]uint32) {
+func (rg *RepeatGenome) krakenFirstPass() (numRawKmers uint64, numRawMins uint64, rawMinCounts []uint32) {
     matchChan := make(chan *Match)
     go func() {
         for i := range rg.Matches {
@@ -137,19 +137,21 @@ func (rg *RepeatGenome) krakenFirstPass() (numRawKmers uint64, rawMinCounts map[
         go rg.getRawMins(matchChan, respChan, wg)
     }
 
-    rawMinCounts = make(map[MinInt]uint32)
-    numRawKmers = 0
+    rawMinCounts = make([]uint32, minSliceSize, minSliceSize)
     for minInt := range respChan {
+        if rawMinCounts[minInt] == 0 {
+            numRawMins++
+        }
         rawMinCounts[minInt]++
         numRawKmers++
     }
 
     wg.Wait()
 
-    return numRawKmers, rawMinCounts
+    return numRawKmers, numRawMins, rawMinCounts
 }
 
-func (rg *RepeatGenome) sortRawKmers(rawKmers Kmers, rawMinCounts map[MinInt]uint32) {
+func (rg *RepeatGenome) sortRawKmers(rawKmers Kmers, rawMinCounts []uint32) {
     wg := new(sync.WaitGroup)
     wg.Add(numCPU)
     kmersChan := make(chan Kmers)
@@ -172,11 +174,7 @@ func (rg *RepeatGenome) sortRawKmers(rawKmers Kmers, rawMinCounts map[MinInt]uin
 
     var start, end uint64 = 0, 0
     for _, minInt := range rg.SortedMins {
-        cnt, exists := rawMinCounts[minInt]
-        if !exists {
-            minInt.print(); fmt.Println("does not exist in rawMinCounts")
-        }
-        end += uint64(cnt)
+        end += uint64(rawMinCounts[minInt])
         kmersChan <- rawKmers[start : end]
         start = end
     }
@@ -185,22 +183,20 @@ func (rg *RepeatGenome) sortRawKmers(rawKmers Kmers, rawMinCounts map[MinInt]uin
     wg.Wait()
 }
 
-func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts map[MinInt]uint32) Kmers {
+func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts []uint32) Kmers {
     // we need a map telling us the next place to insert a kmer associated with any given minimizer
     // we simply increment a minimizer's offset when we insert a kmer associated with it
-    locMap := make(map[MinInt]uint64, len(rawMinCounts))
-    if len(rg.SortedMins) > 0 {
-        locMap[rg.SortedMins[0]] = 0
+    locMap := make([]int64, minSliceSize, minSliceSize)
 
-        for i := 1; i < len(rg.SortedMins); i++ {
-            thisMin := rg.SortedMins[i]
-            lastMin := rg.SortedMins[i-1]
-            locMap[thisMin] = locMap[lastMin] + uint64(rawMinCounts[lastMin])
-        }
+    for i := 1; i < len(rg.SortedMins); i++ {
+        thisMin := rg.SortedMins[i]
+        lastMin := rg.SortedMins[i-1]
+        locMap[thisMin] = locMap[lastMin] + int64(rawMinCounts[lastMin])
     }
+    // could set all unoccupied locMap indices to -1 here for debugging
 
     // we now populate the raw kmers list, filing each according to its minimizer
-    rawKmers := make(Kmers, numRawKmers, numRawKmers)
+    rawKmers := make(Kmers, numRawKmers)
     matchChan := make(chan *Match, 500)
     go func() {
         for i := range rg.Matches {
@@ -226,7 +222,6 @@ func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts map[MinInt]
         rawKmers[locMap[respPair.MinInt]] = respPair.Kmer
         locMap[respPair.MinInt]++
     }
-
 
     return rawKmers
 }
@@ -299,16 +294,18 @@ func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
 func (rg *RepeatGenome) genKrakenLib() {
 
     fmt.Println("beginning first pass")
-    numRawKmers, rawMinCounts := rg.krakenFirstPass()
+    numRawKmers, numRawMins, rawMinCounts := rg.krakenFirstPass()
 
-    fmt.Println("expecting", comma(uint64(len(rawMinCounts))), "unique minimizers")
+    fmt.Println("expecting", comma(numRawMins), "unique minimizers")
     fmt.Println("expecting", comma(numRawKmers), "non-unique kmers")
     fmt.Println()
 
     // populate a list of sorted minimizers
-    rg.SortedMins = make(MinInts, 0, len(rawMinCounts))
-    for minInt, _ := range rawMinCounts {
-        rg.SortedMins = append(rg.SortedMins, minInt)
+    rg.SortedMins = make(MinInts, 0, numRawMins)
+    for minInt, cnt := range rawMinCounts {
+        if cnt > 0 {
+            rg.SortedMins = append(rg.SortedMins, MinInt(minInt))
+        }
     }
     fmt.Println("RepeatGenome.SortedMins generated")
     fmt.Println()
@@ -327,7 +324,7 @@ func (rg *RepeatGenome) genKrakenLib() {
         rawKmers.checkIntegrity()
     }
 
-    fmt.Println("len(rawMinCounts):", comma(uint64(len(rawMinCounts))))
+    //fmt.Println("len(rawMinCounts):", comma(uint64(len(rawMinCounts))))
 
     fmt.Println("sorting rawKmers")
     rg.sortRawKmers(rawKmers, rawMinCounts)
@@ -343,7 +340,7 @@ func (rg *RepeatGenome) genKrakenLib() {
     runtime.GC()
 
     fmt.Println("generating RepeatGenome.MinCounts")
-    rg.MinCounts = make(map[MinInt]uint32)
+    rg.MinCounts = make([]uint32, minSliceSize, minSliceSize)
     for _, kmer := range rg.Kmers {
         kmerInt := *(*KmerInt)(unsafe.Pointer(&kmer))
         rg.MinCounts[kmerInt.Minimize()]++

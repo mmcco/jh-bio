@@ -108,7 +108,21 @@ func (rg *RepeatGenome) checkIntegrity() {
     }
     fmt.Println("rg.SortedMins is indeed sorted and unique")
 
-    if len(rg.SortedMins) != len(rg.MinCounts) || len(rg.MinCounts) != len(rg.MinOffsets) {
+    mcLen := 0
+    for _, cnt := range rg.MinCounts {
+        if cnt > 0 {
+            mcLen++
+        }
+    }
+
+    ofstLen := 0
+    for _, offset := range rg.MinOffsets {
+        if offset >= 0 {
+            ofstLen++
+        }
+    }
+
+    if len(rg.SortedMins) != mcLen || mcLen != ofstLen {
         fmt.Println("ERROR: rg.SortedMins, rg.MinCounts, and rg.MinOffsets of inconsistent size")
         os.Exit(1)
     } else {
@@ -116,13 +130,13 @@ func (rg *RepeatGenome) checkIntegrity() {
     }
     
     for _, minInt := range rg.SortedMins {
-        _, exists := rg.MinCounts[minInt]
-        if !exists {
+        cnt := rg.MinCounts[minInt]
+        if cnt < 1 {
             fmt.Println("minimizer in rg.SortedMins absent from rg.MinCounts")
             os.Exit(1)
         }
-        _, exists = rg.MinOffsets[minInt]
-        if !exists {
+        offset := rg.MinOffsets[minInt]
+        if offset < 0 {
             fmt.Println("minimizer in rg.SortedMins absent from rg.MinOffsets")
             os.Exit(1)
         }
@@ -131,12 +145,10 @@ func (rg *RepeatGenome) checkIntegrity() {
 
     for _, kmer := range rg.Kmers {
         kmerInt := *(*KmerInt)(unsafe.Pointer(&kmer))
-        foundKmer := rg.getKmer(kmerInt)
-        if foundKmer == nil {
+        lca := rg.getKmerLCA(kmerInt)
+        if lca == nil {
             fmt.Print("ERROR: kmer "); kmerInt.print(); fmt.Println("not found by rg.getKmer()");
             os.Exit(1)
-        } else if *(*KmerInt)(unsafe.Pointer(foundKmer)) != kmerInt {
-            fmt.Print("ERROR: kmer "); kmerInt.print(); fmt.Println("caused a false positive return by rg.getKmer()");
         }
     }
 }

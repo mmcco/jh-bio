@@ -303,7 +303,7 @@ func (rg *RepeatGenome) getMinIndices(minInt MinInt) (uint64, uint64) {
 // Intended for non-performance-critical sections, like file writing.
 func (rg *RepeatGenome) getMinsKmers(minInt MinInt) Kmers {
     startInd := rg.MinOffsets[minInt]
-    endInd := startInd + uint64(rg.MinCounts[minInt])
+    endInd := startInd + int64(rg.MinCounts[minInt])
     return rg.Kmers[startInd : endInd]
 }
 
@@ -329,13 +329,19 @@ func (rg *RepeatGenome) populateMinOffsets() {
         fmt.Println("!!! WARNING !!! RepeatGenome.populateMinOffsets overwriting previous map")
     }
 
-    rg.MinOffsets = make(map[MinInt]uint64, len(rg.SortedMins))
+    rg.MinOffsets = make([]int64, minSliceSize, minSliceSize)
+    // initialize to -1 to make explicit which indices are not mins
+    for i := 0; i < len(rg.MinOffsets); i++ {
+        rg.MinOffsets[i] = -1
+    }
+
     if len(rg.SortedMins) > 0 {
         rg.MinOffsets[rg.SortedMins[0]] = 0
+        lastMin := rg.SortedMins[0]
         for i := 1; i < len(rg.SortedMins); i++ {
             thisMin := rg.SortedMins[i]
-            lastMin := rg.SortedMins[i-1]
-            rg.MinOffsets[thisMin] = rg.MinOffsets[lastMin] + uint64(rg.MinCounts[lastMin])
+            rg.MinOffsets[thisMin] = rg.MinOffsets[lastMin] + int64(rg.MinCounts[lastMin])
+            lastMin = thisMin
         }
     } 
 }

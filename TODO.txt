@@ -14,6 +14,8 @@ Functions for pointer accesses?
 
 A lot of explicit variable types could be safely removed.
 
+Non-exported globals or constants for bit offsets (e.g. that of a Kmer's LCA?)
+
 We really need a map to get min's indexes/offsets in O(1) time. getMin() currently does a binary search.
 
 KmerInt.Minimize() logic could be changed now that minimizers are 32 bits

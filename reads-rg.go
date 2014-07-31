@@ -3,7 +3,6 @@ package repeatgenome
 import (
     "os"
     "sync"
-    "unsafe"
 )
 
 type ReadResponse struct {
@@ -34,11 +33,10 @@ ReadLoop:
 
             kmerBytes := read[i : i+k_]
             kmerInt := kmerBytes.kmerInt().canonicalRepr()
-            kmer := rg.getKmer(kmerInt)
+            lca := rg.getKmerLCA(kmerInt)
 
-            if kmer != nil {
-                lcaID := *(*uint16)(unsafe.Pointer(&kmer[8]))
-                responseChan <- ReadResponse{read, rg.ClassTree.NodesByID[lcaID]}
+            if lca != nil {
+                responseChan <- ReadResponse{read, lca}
                 // only use the first matched kmer
                 continue ReadLoop
             }
