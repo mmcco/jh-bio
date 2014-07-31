@@ -1,10 +1,11 @@
 package repeatgenome
 
+// General sequence-manipulation functions.
+
 import (
     "fmt"
     "unsafe"
 )
-// General sequence-manipulation functions.
 
 func (seq TextSeq) kmerInt() KmerInt {
     if len(seq) < 1 || len(seq) > 31 {
@@ -63,10 +64,10 @@ func (kmerInt KmerInt) revComp() KmerInt {
     var i uint8
     for i = 0; i < k; i++ {
         revComp <<= 2
-        revComp |= kmerInt & 3
+        revComp |= 3 &^ kmerInt    // BEWARE: &^ is not commutative
         kmerInt >>= 2
     }
-    return revComp ^ kMask
+    return revComp
 }
 
 func (minInt MinInt) revComp() MinInt {
@@ -74,10 +75,10 @@ func (minInt MinInt) revComp() MinInt {
     var i uint8
     for i = 0; i < m; i++ {
         revComp <<= 2
-        revComp |= minInt & 3
+        revComp |= 3 &^ minInt    // BEWARE: &^ is not commutative
         minInt >>= 2
     }
-    return revComp ^ MinInt(mMask)
+    return revComp
 }
 
 func (kmerInt KmerInt) Minimize() MinInt {
@@ -106,90 +107,51 @@ func (kmerInt KmerInt) Minimize() MinInt {
     return MinInt(currMin)
 }
 
-func (seq TextSeq) revComp() TextSeq {
-    var revCompSeq = make(TextSeq, 0, len(seq))
-    for i := range seq {
-        switch seq[len(seq)-i-1] {
-        case 'a':
-            revCompSeq = append(revCompSeq, 't')
-            break
-        case 't':
-            revCompSeq = append(revCompSeq, 'a')
-            break
-        case 'c':
-            revCompSeq = append(revCompSeq, 'g')
-            break
-        case 'g':
-            revCompSeq = append(revCompSeq, 'c')
-            break
-        default:
-            panic("byte other than 'a', 'c', 'g', or 't' supplied to revComp")
-        }
-    }
-    return revCompSeq
-}
-
-// The logic for determining the minimizer
-// Currently, it uses simple lexicographic ordering
-// The function's name allows it to be used in a sort.Interface implementation, if we ever need one.
-func (a TextSeq) Less(b TextSeq) bool {
-    // min function manually inlined for speed - dubious
-    var size int
-    if len(a) < len(b) {
-        size = len(a)
-    } else {
-        size = len(b)
-    }
-    for i := 0; i < size; i++ {
-        if a[i] < b[i] {
-            return true
-        }
-        if a[i] > b[i] {
-            return false
-        }
-    }
-    return false
-}
-
 func (textSeq TextSeq) Seq() Seq {
-    numBases := uint64(len(textSeq))
-    numBytes := ceilDiv_U64(numBases, 4)
+    numBases := len(textSeq)
+    numBytes := ceilDiv(numBases, 4)
     seq := Seq{
         Bytes: make([]byte, numBytes, numBytes),
-        Len: numBases,
+        Len: uint64(numBases),
     }
-    var i uint64
-    for i = 0; i < uint64(len(textSeq)); i++ {
+
+    // determines how much to shift the byte of interest
+    var shift uint8 = 6
+    for i := 0; i < len(textSeq); i++ {
         byteInd := i / 4
-        shift := 6 - 2*(i%4)
+
         switch textSeq[i] {
         case 'a':
             // already zero
             break
         case 'c':
-            seq.Bytes[byteInd] |= (uint8(1) << shift)
+            seq.Bytes[byteInd] |= 1 << shift
             break
         case 'g':
-            seq.Bytes[byteInd] |= (uint8(2) << shift)
+            seq.Bytes[byteInd] |= 2 << shift
             break
         case 't':
-            seq.Bytes[byteInd] |= (uint8(3) << shift)
+            seq.Bytes[byteInd] |= 3 << shift
             break
         case 'A':
             // already zero
             break
         case 'C':
-            seq.Bytes[byteInd] |= (uint8(1) << shift)
+            seq.Bytes[byteInd] |= 1 << shift
             break
         case 'G':
-            seq.Bytes[byteInd] |= (uint8(2) << shift)
+            seq.Bytes[byteInd] |= 2 << shift
             break
         case 'T':
-            seq.Bytes[byteInd] |= (uint8(3) << shift)
+            seq.Bytes[byteInd] |= 3 << shift
             break
         default:
             panic("TextSeq.GetSeq(): byte other than 'a', 'c', 'g', or 't' encountered")
         }
+
+        // starts at 6, wraps around to 254, which mods to 0
+        // therefore loops 6 -> 4 -> 2 -> 0 -> ...
+        shift = (shift - 2) % 8
     }
 
     return seq
