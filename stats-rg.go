@@ -30,7 +30,11 @@ func (rg *RepeatGenome) PercentRepeats() float64 {
     return 100 * (float64(repeatBases) / float64(totalBases))
 }
 
-func (repeat *Repeat) RepeatSize() uint64 {
+func (match *Match) Size() uint64 {
+    return match.SeqEnd - match.SeqStart
+}
+
+func (repeat *Repeat) Size() uint64 {
     var repeatSize uint64 = 0
 
     for _, match := range repeat.Instances {
@@ -112,6 +116,9 @@ func (rg *RepeatGenome) AvgPossPercentGenome(resps []ReadResponse, strict bool) 
 func (rg *RepeatGenome) recNodeSearch(classNode *ClassNode, readSAM ReadSAM, strict bool) bool {
     if classNode != nil && classNode.Repeat != nil {
         for _, match := range classNode.Repeat.Instances {
+            if match.SeqName != readSAM.SeqName {
+                return false
+            }
             // must compute where the read ends
             endInd := readSAM.StartInd + uint64(len(readSAM.Seq))
             overlap := readSAM.SeqName == match.SeqName && readSAM.StartInd < match.SeqEnd && endInd > match.SeqStart
@@ -185,14 +192,14 @@ func TestNodeSearch(classNode *ClassNode, readSAM ReadSAM) bool {
 */
 
 // we currently use the simple metric that the read and one of the repeat's instances overlap at all
-func (rg *RepeatGenome) PercentTrueClassifications(responses []ReadSAMResponse, strict bool) float64 {
+func (rg *RepeatGenome) PercentTrueClassifications(responses []ReadSAMResponse, useStrict bool) float64 {
     var classifications, correctClassifications uint64 = 0, 0
 
     for _, resp := range responses {
         if resp.ClassNode != nil {
             classifications++
         }
-        if rg.recNodeSearch(resp.ClassNode, resp.ReadSAM, strict) {
+        if rg.recNodeSearch(resp.ClassNode, resp.ReadSAM, useStrict) {
             correctClassifications++
         }
     }

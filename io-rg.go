@@ -285,6 +285,31 @@ func fillMinBuf(slice TextSeq, seqInt MinInt) {
     }
 }
 
+func (rg *RepeatGenome) WriteStatData() error {
+    statDirName := rg.Name + "-stats/"
+    err := os.Mkdir(statDirName, 0777)
+    if err != nil && !os.IsExist(err) {
+        return IOError{"RepeatGenome.WriteStatData()", err}
+    }
+
+    err = rg.Repeats.Write(statDirName + "repeats.txt")
+    if err != nil {
+        return IOError{"RepeatGenome.WriteStatData()", err}
+    }
+
+    err = rg.Matches.Write(statDirName + "matches.txt")
+    if err != nil {
+        return IOError{"RepeatGenome.WriteStatData()", err}
+    }
+
+    err = ClassNodes(rg.ClassTree.NodesByID).Write(statDirName + "class-nodes.txt")
+    if err != nil {
+        return IOError{"RepeatGenome.WriteStatData()", err}
+    }
+
+    return nil
+}
+
 func (repeats Repeats) Write(filename string) error {
     outfile, err := os.Create(filename)
     if err != nil {
@@ -292,10 +317,41 @@ func (repeats Repeats) Write(filename string) error {
     }
     defer outfile.Close()
 
-    fmt.Fprintln(outfile, "ID\tName\tNumInstances\tDepth")
+    fmt.Fprintln(outfile, "ID\tName\tNumInstances\tDepth\n")
     for _, repeat := range repeats {
         fmt.Fprintf(outfile, "%d\t%s\t%d\t%d\n", repeat.ID, repeat.Name, len(repeat.Instances), len(repeat.ClassList))
     }
+
+    return nil
+}
+
+func (classNodes ClassNodes) Write(filename string) error {
+    outfile, err := os.Create(filename)
+    if err != nil {
+        return IOError{"ClassNodes.Write()", err}
+    }
+    defer outfile.Close()
+
+    fmt.Fprintln(outfile, "ID\tName\tDepth\tNumChildren\tIsRepeat\n")
+    for _, cn := range classNodes {
+        fmt.Fprintf(outfile, "%d\t%s\t%d\t%d\t%v\n", cn.ID, cn.Name, len(cn.Class), len(cn.Children), cn.Repeat != nil)
+    }
+
+    return nil
+}
+
+func (matches Matches) Write(filename string) error {
+    outfile, err := os.Create(filename)
+    if err != nil {
+        return IOError{"Matches.Write()", err}
+    }
+    defer outfile.Close()
+
+    fmt.Fprintln(outfile, "ID\tClassNode_ID\tSize\nChrom\tSW_Score\n")
+    for _, match := range matches {
+        fmt.Fprintf(outfile, "%d\t%d\t%d\t%s\t%d\n", match.ID, match.ClassNode.ID, match.SeqEnd - match.SeqStart, match.SeqName, match.SW_Score)
+    }
+
     return nil
 }
 
