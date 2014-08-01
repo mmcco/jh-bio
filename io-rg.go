@@ -319,7 +319,13 @@ func (repeats Repeats) Write(filename string) error {
 
     fmt.Fprintln(outfile, "ID\tName\tNumInstances\tDepth\n")
     for _, repeat := range repeats {
-        fmt.Fprintf(outfile, "%d\t%s\t%d\t%d\n", repeat.ID, repeat.Name, len(repeat.Instances), len(repeat.ClassList))
+        var depth int
+        if repeat.Name == "root" {
+            depth = 0
+        } else {
+            depth = len(repeat.ClassList)
+        }
+        fmt.Fprintf(outfile, "%d\t%s\t%d\t%d\n", repeat.ID, repeat.Name, len(repeat.Instances), depth)
     }
 
     return nil
@@ -334,7 +340,13 @@ func (classNodes ClassNodes) Write(filename string) error {
 
     fmt.Fprintln(outfile, "ID\tName\tDepth\tNumChildren\tIsRepeat\n")
     for _, cn := range classNodes {
-        fmt.Fprintf(outfile, "%d\t%s\t%d\t%d\t%v\n", cn.ID, cn.Name, len(cn.Class), len(cn.Children), cn.Repeat != nil)
+        depth := 0
+        walker := cn
+        for walker.Parent != nil {
+            depth++
+            walker = walker.Parent
+        }
+        fmt.Fprintf(outfile, "%d\t%s\t%d\t%d\t%v\n", cn.ID, cn.Name, depth, len(cn.Children), cn.Repeat != nil)
     }
 
     return nil

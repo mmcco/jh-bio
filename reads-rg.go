@@ -19,6 +19,7 @@ ReadLoop:
         k_ := int64(k)
         numKmers := int64(len(read)) - k_ + 1
 
+        //var lca *ClassNode = nil
         var i int64
     KmerLoop:
         for i = 0; i < numKmers; i++ {
@@ -33,14 +34,22 @@ ReadLoop:
 
             kmerBytes := read[i : i+k_]
             kmerInt := kmerBytes.kmerInt().canonicalRepr()
-            lca := rg.getKmerLCA(kmerInt)
+            kmerLCA := rg.getKmerLCA(kmerInt)
 
-            if lca != nil {
-                responseChan <- ReadResponse{read, lca}
+            if kmerLCA != nil {
+                /*
+                if lca == nil {
+                    lca = kmerLCA
+                } else {
+                    lca = rg.ClassTree.getLCA(lca, kmerLCA)
+                }
+                */
                 // only use the first matched kmer
+                responseChan <- ReadResponse{read, kmerLCA}
                 continue ReadLoop
             }
         }
+        //responseChan <- ReadResponse{read, lca}
         responseChan <- ReadResponse{read, nil}
     }
     close(responseChan)

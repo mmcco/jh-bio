@@ -1,14 +1,18 @@
-WARNING!!! This program is currently under development and may be buggy or broken.
+WARNING!!! This program is currently under development and may be buggy or
+broken.
 
-A barebones (at the moment) Go script for parsing and minimizing RepeatMasker output files alongside FASTA reference genomes.
+A barebones (at the moment) Go script for parsing and minimizing RepeatMasker
+output files alongside FASTA reference genomes.
 
-This script expects there to be a subdirectory of the current directory named after the reference genome used (e.g. "dm3") that contains the following files:
+This script expects there to be a subdirectory of the current directory named
+after the reference genome used (e.g. "dm3") that contains the following files:
    * a RepeatMasker library containing:
        - the match library (e.g. "dm3.fa.out")
        - the alignment information (e.g. "dm3.fa.align")
    * one or more reference genome files in FASTA format with the suffix ".fa"
 
-Premature commenting is the root of all evil, and I have sinned. Please read comments skeptically - they will eventually be audited.
+Premature commenting is the root of all evil, and I have sinned. Please read
+comments skeptically - they will eventually be audited.
 
 Functions for pointer accesses?
 
@@ -16,33 +20,48 @@ A lot of explicit variable types could be safely removed.
 
 Non-exported globals or constants for bit offsets (e.g. that of a Kmer's LCA?)
 
-We really need a map to get min's indexes/offsets in O(1) time. getMin() currently does a binary search.
+A ClassifyReadsFile() function that dispatches to different functions based on
+the reads filetype
+
+We really need a map to get min's indexes/offsets in O(1) time. getMin()
+currently does a binary search.
 
 KmerInt.Minimize() logic could be changed now that minimizers are 32 bits
 
-Should a Seq's first field be a *byte to discard the extra two fields? If not, we could probably use len() in Seq manipulations.
+Should a Seq's first field be a *byte to discard the extra two fields? If not,
+we could probably use len() in Seq manipulations.
 
 Should make a flag to prevent writing Kraken library.
 
 Should probably make a file solely for type defs.
 
-Reads are currently kept in TextSeq form until the bitter end because, with Go's referenced based slices, there's no compelling reason not to, and because they're easier (and probably faster) to manipulate than Seqs. This may change at some point, though.
+Reads are currently kept in TextSeq form until the bitter end because, with Go's
+referenced based slices, there's no compelling reason not to, and because
+they're easier (and probably faster) to manipulate than Seqs. This may change at
+some point, though.
 
-If a minimizer is associated with a single repeat type, can we use that heuristically?
+If a minimizer is associated with a single repeat type, can we use that
+heuristically?
 
-Error handling should be updated with a custom ParseError type - panics should be removed, excepting performance-cricial sequence manipulation functions
+Error handling should be updated with a custom ParseError type - panics should
+be removed, excepting performance-cricial sequence manipulation functions
 
 Should consider splitting at hyphenated class names like TcMar-Tc1
 
-The concurrent read-kmer generator could be reintroduced using a select statement.
+The concurrent read-kmer generator could be reintroduced using a select
+statement.
 
 Should probably restrict activity of chans with directionals
 
-It would make sense to discard kmers associated with ClassNodes greater than a certain size.
+It would make sense to discard kmers associated with ClassNodes greater than a
+certain size.
 
-Kmer counting should be re-added eventually - it's currently excluded for performance reasons because we aren't using it.
+Kmer counting should be re-added eventually - it's currently excluded for
+performance reasons because we aren't using it.
 
-We should test a version that doesn't cache minimizers, as that seems to be a needless bottleneck. It could also be conditional on the number of CPUs available.
+We should test a version that doesn't cache minimizers, as that seems to be a
+needless bottleneck. It could also be conditional on the number of CPUs
+available.
 
 All sequences containing Ns are currently ignored.
 
@@ -50,7 +69,9 @@ We should consider taking end minimizers once the code base is more mature.
 
 We should also review how to deal with m <= len(match) < k.
 
-For caching efficiency, we should change the minimizer data structure to a map-indexed 1D slice of Kmers (not *Kmers). (This technique originated in Kraken.)
+For caching efficiency, we should change the minimizer data structure to a
+map-indexed 1D slice of Kmers (not *Kmers). (This technique originated in
+Kraken.)
 
 Int sizes should be reviewed for memory efficiency.
 

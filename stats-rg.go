@@ -117,7 +117,7 @@ func (rg *RepeatGenome) recNodeSearch(classNode *ClassNode, readSAM ReadSAM, str
     if classNode != nil && classNode.Repeat != nil {
         for _, match := range classNode.Repeat.Instances {
             if match.SeqName != readSAM.SeqName {
-                return false
+                continue
             }
             // must compute where the read ends
             endInd := readSAM.StartInd + uint64(len(readSAM.Seq))
