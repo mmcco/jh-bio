@@ -13,17 +13,20 @@ import (
     "sync"
 )
 
-// These variables are used ubiquitously, especially in performance-critical functions, so we grudgingly make them globals
+// These variables are used ubiquitously, especially in performance-critical functions, so we grudgingly make them globals.
+// K is the kmer size (in basepairs).
+// M is the minimizer size, which must be <= k.
 var k, m uint8
-// masks contain k and m consecutive right aligned 1 bits respectively (e.g. "0000011111111")
+// kMask and mMask contain k and m consecutive right aligned 1 bits respectively (e.g. "0000011111111").
 var kMask, mMask KmerInt
-// the size of a slice that can be indexed by any minimizer
+// minSliceSize is the size of a slice that contains indexes for all possible mMers.
+// It is calculated as: 1 << m
 var minSliceSize uint64
 var debug bool
-
-// a rudimentary way of deciding how many threads to allow, should eventually be improved
+// This is used as a rudimentary way of determining how many goroutines to spawn in concurrent sections.
 var numCPU = runtime.NumCPU()
 
+// A value of type Config is passed to the New() function, which constructs a new RepeatGenome
 type Config struct {
     Name        string
     K           uint8
@@ -37,6 +40,8 @@ type Config struct {
 }
 
 /*
+   A match is a specific instance of a repeat sequence that RepeatMasker recognized in the reference genome it was supplied.
+
    Match.SW_Score - Smith-Waterman score, describing the likeness to the repeat reference sequence
    Match.PercDiv - "% substitutions in matching region compared to the consensus" - RepeatMasker docs
    Match.PercDel - "% of bases opposite a gap in the query sequence (deleted bp)" - RepeatMasker docs
@@ -52,7 +57,7 @@ type Config struct {
    Match.RepeatRemains - the number of bases past the end of the match in the consensus repeat sequence
    Match.InsertionID - a numerical ID for the repeat type (starts at 1)
   
-       below are not in parsed data file
+   The below fields are not parsed, but rather calculated.
    Match.RepeatName - simply repeatClass concatenated - used for printing and map indexing
    Match.ClassNode - pointer to corresponding ClassNode in RepeatGenome.ClassTree
    Match.Repeat - pointer to corresponding Repeat struct in RepeatGenome.Repeats
