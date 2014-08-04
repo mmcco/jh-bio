@@ -24,6 +24,7 @@ var minSliceSize uint64
 var debug bool
 // This is used as a rudimentary way of determining how many goroutines to spawn in concurrent sections.
 var numCPU = runtime.NumCPU()
+// Used to write heap memory profile.
 var memProfFile *os.File
 
 // A value of type Config is passed to the New() function, which constructs and returns a new RepeatGenome.
@@ -185,10 +186,6 @@ type ClassTree struct {
     Root *ClassNode
 }
 
-// A representation of a genetic sequence using one byte letter per base.
-// A type synonym is used to differentiate one-byte-per-base sequences from two-bits-per-base sequences (type Seq), which also use the concrete type []byte.
-type TextSeq []byte
-
 /* A two-bits-per-base sequence of up to 31 bases, with low-order bits occupied first.
    00 = 'a'
    01 = 'c'
@@ -209,8 +206,11 @@ type MinInts []MinInt
 */
 type MinKey uint8
 
-// The first eight bits are the integer representation of the kmer's sequence (type KmerInt).
-// The last two are the LCA ID (type uint16).
+/*
+   This is what is stored by the main Kraken data structure: RepeatGenome.Kmers
+   The first eight bits are the integer representation of the kmer's sequence (type KmerInt).
+   The last two are the LCA ID (type uint16).
+*/
 type Kmer [10]byte
 type Kmers []Kmer
 type PKmers []*Kmer
@@ -227,20 +227,21 @@ type Seq struct {
 
 type Seqs []Seq
 
+// A 2-dimensional map used to represent a newly-parsed FASTA-formatted reference genome.
 type Chroms map[string](map[string]TextSeq)
 
 func parseMatches(genomeName string) (error, Matches) {
     // "my_genome_name"  ->  "my_genome_name/my_genome_name.fa.out"
     filepath := strings.Join([]string{genomeName, "/", genomeName, ".fa.out"}, "")
+
     err, matchLines := fileLines(filepath)
     if err != nil {
         return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
     }
-    // drop header
-    matchLines = matchLines[3:]
+
+    matchLines = matchLines[3:]    // drop the header lines
 
     var matches Matches
-    var sw_Score int64
 
     for _, matchLine := range matchLines {
         rawVals := strings.Fields(string(matchLine))
@@ -264,7 +265,7 @@ func parseMatches(genomeName string) (error, Matches) {
         }
 
         // everything in this block is just vanilla trimming, converting, and error checking
-        sw_Score, err = strconv.ParseInt(rawVals[0], 10, 32)
+        sw_Score, err := strconv.ParseInt(rawVals[0], 10, 32)
         if err != nil {
             return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
         }
