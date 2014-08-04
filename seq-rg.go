@@ -118,32 +118,31 @@ func (textSeq TextSeq) Seq() Seq {
     // determines how much to shift the byte of interest
     var shift uint8 = 6
     for i := 0; i < len(textSeq); i++ {
-        byteInd := i / 4
 
         switch textSeq[i] {
         case 'a':
             // already zero
             break
         case 'c':
-            seq.Bytes[byteInd] |= 1 << shift
+            seq.Bytes[i/4] |= 1 << shift
             break
         case 'g':
-            seq.Bytes[byteInd] |= 2 << shift
+            seq.Bytes[i/4] |= 2 << shift
             break
         case 't':
-            seq.Bytes[byteInd] |= 3 << shift
+            seq.Bytes[i/4] |= 3 << shift
             break
         case 'A':
             // already zero
             break
         case 'C':
-            seq.Bytes[byteInd] |= 1 << shift
+            seq.Bytes[i/4] |= 1 << shift
             break
         case 'G':
-            seq.Bytes[byteInd] |= 2 << shift
+            seq.Bytes[i/4] |= 2 << shift
             break
         case 'T':
-            seq.Bytes[byteInd] |= 3 << shift
+            seq.Bytes[i/4] |= 3 << shift
             break
         default:
             panic("TextSeq.GetSeq(): byte other than 'a', 'c', 'g', or 't' encountered")

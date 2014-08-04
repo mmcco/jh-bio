@@ -25,8 +25,9 @@ var minSliceSize uint64
 var debug bool
 // This is used as a rudimentary way of determining how many goroutines to spawn in concurrent sections.
 var numCPU = runtime.NumCPU()
+var memProfFile *os.File
 
-// A value of type Config is passed to the New() function, which constructs a new RepeatGenome
+// A value of type Config is passed to the New() function, which constructs and returns a new RepeatGenome.
 type Config struct {
     Name        string
     K           uint8
@@ -40,27 +41,42 @@ type Config struct {
 }
 
 /*
-   A match is a specific instance of a repeat sequence that RepeatMasker recognized in the reference genome it was supplied.
+   RepeatMasker is a program that takes as input a set of reference repeat sequences and a reference genome.
+   It outputs "matches", specific instances of supplied reference repeats in the supplied reference genome.
+   These are stored in the file <genome-name>.fa.out, and are parsed line-by-line into values of this type.
 
-   Match.SW_Score - Smith-Waterman score, describing the likeness to the repeat reference sequence
+   Match.SW_Score - Smith-Waterman score, describing the likeness of this match to the repeat reference sequence.
    Match.PercDiv - "% substitutions in matching region compared to the consensus" - RepeatMasker docs
    Match.PercDel - "% of bases opposite a gap in the query sequence (deleted bp)" - RepeatMasker docs
    Match.PercIns - "% of bases opposite a gap in the repeat consensus (inserted bp)" - RepeatMasker docs
-   Match.SeqName -  the reference genome file this match came from (typically the chromosome)
-   Match.SeqStart -  the starting index (inclusive) in the reference genome
-   Match.SeqEnd -  the ending index (exclusive) in the reference genome
-   Match.SeqRemains - the number of bases past the end of the match in the relevant reference seqence
-   Match.IsRevComp -  the match may be for the complement of the reference sequence
-   Match.RepeatClass - the repeat's full ancestry, including its repeat class and repeat name (which are listed separately in the RepeatMasker output file)
-   Match.RepeatStart-  the starting index in the repeat consensus sequence
-   Match.RepeatEnd -  the ending sequence (exclusive) in the consensus repeat  sequence
-   Match.RepeatRemains - the number of bases past the end of the match in the consensus repeat sequence
-   Match.InsertionID - a numerical ID for the repeat type (starts at 1)
+   Match.SeqName - The name (without ".fa") of the reference genome FASTA file this match came from.
+                   It is typically the chromosome name, such as "chr2L".
+                   This is inherently unsound, as RepeatMasker gives only a 1-dimensional qualification, but FASTA-formatted reference genomes are 2-dimensional, using both filename and sequence name.
+                   Reference genome FASTA files generally contain only a single sequence, with the same name as the file.
+                   If this is not the case when parsing a FASTA reference genome, we print an ominous warning to stdout and use the sequence name.
+   Match.SeqStart - The match's start index (inclusive and zero-indexed) in the reference genome. Note that RepeatMasker's output is one-indexed.
+   Match.SeqEnd - The end index (exclusive and zero-indexed) in the reference genome.
+   Match.SeqRemains - The number of bases past the end of the match in the relevant reference sequence.
+   Match.IsRevComp - Whether the match was for the reverse complement of the reference repeat sequence. In this case, we manually adjust some location fields, as RepeatMasker's output gives indexes for the reverse complement of the reference sequence. This allows us to treat all matches with the same logic.
+   Match.RepeatClass - The repeat's full ancestry in a slice of strings.
+                       This includes its repeat class and repeat name, which are listed separately in the RepeatMasker output file.
+                       Root is implicit and excluded.
+   Match.RepeatStart - The start index (inclusive and zero-indexed) of this match in the repeat consensus sequence.
+                       A signed integer is used because it can be negative in weird cases.
+   Match.RepeatEnd - The end sequence (exclusive and zero-indexed) of this match in the consensus repeat sequence.
+                     A signed integer is used, in agreement with Match.RepeatStart.
+   Match.RepeatRemains - The number of bases at the end of the consensus repeat sequence that this match excludes.
+   Match.InsertionID - A numerical ID that is the same only for matches of the same long terminal repeat (LTR) instance.
+                       The sequences classified as <LTR name>_I or <LTR name>_int are the internal sequences of LTRs. These are less well defined than the core LTR sequence.
+                       These IDs begin at 1.
   
    The below fields are not parsed, but rather calculated.
-   Match.RepeatName - simply repeatClass concatenated - used for printing and map indexing
-   Match.ClassNode - pointer to corresponding ClassNode in RepeatGenome.ClassTree
-   Match.Repeat - pointer to corresponding Repeat struct in RepeatGenome.Repeats
+   Match.RepeatName - Simply Match.RepeatClass's items concatenated.
+                      It is used for quick printing, and is not necessarily going to remain in the long-term.
+   Match.ClassNode - A pointer to the match's corresponding ClassNode in RepeatGenome.ClassTree.
+   Match.Repeat - A pointer to the match's corresponding Repeat in RepeatGenome.Repeats.
+   Match.ID - A unique ID, used as a quick way of referencing and indexing a repeat.
+              Pointers can generally be used, so this isn't necessarily going to remain in the long-term.
 */
 type Match struct {
     SW_Score    int32
@@ -73,7 +89,6 @@ type Match struct {
     SeqRemains  uint64
     IsRevComp   bool
     RepeatClass []string
-    // in weird cases, RepeatStart can be negative, so they must be signed
     RepeatStart   int64
     RepeatEnd     int64
     RepeatRemains int64
@@ -86,14 +101,25 @@ type Match struct {
     ID         uint64
 }
 
+/*
+   RepeatGenome.Name - The name of the reference genome, such as "dm3" or "hg38".
+                       This is used to name created directories, and to find directories and files that may be read from, such as a stored Kraken library and reference sequences.
+   RepeatGenome.chroms - A 2-dimensional map mapping a chromosome name to a map of its sequence names to their sequences (in text form).
+                         Actual 2-dimensional mapping is currently impossible because of RepeatMasker's 1-dimensional output.
+   RepeatGenome.Kmers - A slice of all Kmers, sorted primarily by minimizer and secondarily by lexicographical value.
+   RepeatGenome.MinOffsets - Maps a minimizer to its offset in the Kmers slice, or -1 if no kmers of this minimizer were stored.
+   RepeatGenome.MinCounts - Maps a minimizer to the number of stored kmers associated with it.
+   RepeatGenome.SortedMins - A sorted slice of all minimizers of stored kmers.
+   RepeatGenome.Matches - All matches, indexed by their assigned IDs.
+   RepeatGenome.ClassTree - Contains all information used for LCA determination and read classification.
+                            It may eventually be collapsed into RepeatGenome, as accessing it is rather verbose.
+   RepeatGenome.Repeats - A slice of all repeats, indexed by their assigned IDs.
+   RepeatGenome.RepeatMap - Maps a fully qualified repeat name, excluding root, to its struct.
+*/
 type RepeatGenome struct {
     Name       string
-    // maps a chromosome name to a map of its sequences
-    // as discussed above, though, matches only contain 1D sequence indexes
     chroms         Chroms
     Kmers          Kmers
-    // stores the offset of each minimizer's first kmer in RepeatGenome.Kmers - indexed by the minimizer's index in SortedMins
-    // a negative value indicates that the minimizer does not exist
     MinOffsets     []int64
     MinCounts      []uint32
     SortedMins     MinInts
@@ -101,77 +127,40 @@ type RepeatGenome struct {
     ClassTree      ClassTree
     Repeats        Repeats
     RepeatMap      map[string]*Repeat
-    memProfFile    *os.File
 }
 
-type ClassTree struct {
-    // maps all class names to a pointer to their node struct
-    // we must use pointers because of this foible in golang: https://code.google.com/p/go/issues/detail?id=3117
-    // if we didn't use pointers, we'd have to completely reassign the struct when adding parents, children, etc.
-    ClassNodes map[string](*ClassNode)
-    NodesByID  []*ClassNode
-    // a pointer to the the class tree's root, used for recursive descent etc.
-    // we explicitly create the root (because RepeatMatcher doesn't)
-    Root *ClassNode
-}
-
-type MuxKmers struct {
-    sync.Mutex
-    Kmers Kmers
-}
-
-// Used to differentiate sequence representations with one base per byte (type TextSeq) from those with four bases per byte (type Seq).
-type TextSeq []byte
-
-// Used to clarify context of integers, and to differentiate full Kmers (which include an LCA ID) from integer-represented kmer sequences.
-type KmerInt uint64
-type KmerInts []KmerInt
-
-type MinInt uint32
-type MinInts []MinInt
-
-// Indexes the base of the associated kmer that is the starting index of its minimizer
-// If < 32, the minimizer is the positive strand representation
-// Otherwise, the minimizer is the reverse complement of kmer[minkey-32 : minkey+m-32]
-type MinKey uint8
-
-type MinPair [12]byte
-type MinPairs []MinPair
-
-// can store a kmer where k <= 32
-// the value of k is not stored in the struct, but rather in the RepeatGenome, for memory efficiency
-// first eight bits are the int representation of the sequence
-// the last two are the LCA ID
-type Kmer [10]byte
-
-// as with the Kmer type, each base is represented by two bits
-// any excess bits are the first bits of the first byte (seq is right-justified)
-// remember that len(Seq.Bytes) is not the actual number of bases, but rather the number of bytes necessary to represent them
-type Seq struct {
-    Bytes []byte
-    Len   uint64
-}
-
-type Seqs []Seq
-
-type repeatLoc struct {
-    SeqName  string
-    StartInd uint64
-    EndInd   uint64
-}
-
+/*
+   Repeat.ID - A unique ID that we assign (not included in RepeatMasker output).
+   Repeat.Name - The repeat's fully qualified name, excluding root.
+   Repeat.ClassList - 
+   Repeat.ClassNode - 
+   Repeat.Instances - 
+*/
 type Repeat struct {
     // assigned in simple incremented order starting from 1
     // they are therefore not compatible across genomes
     // we give root ID = 0
     ID uint64
+    Name  string
     // a list containing the repeat's ancestry path, from top down
     // root is implicit, and is therefore excluded from the list
     ClassList []string
     ClassNode *ClassNode
-    Name  string
     Instances []*Match
-    Locations []repeatLoc
+}
+
+/*
+   ClassTree.ClassNodes - Maps a fully qualified class name (excluding root) to that class's ClassNode struct, if it exists.
+                          This is slower than ClassTree.NodesByID, and should only be used when necessary.
+   ClassTree.NodesByID - A slice of pointers to all ClassNode structs, indexed by ID.
+                         This should be the default means of accessing a ClassNode.
+   ClassTree.Root - A pointer to the ClassTree's root, which has name "root" and ID 0.
+                    We explicitly create this - it isn't present in the RepeatMasker output.
+*/
+type ClassTree struct {
+    ClassNodes map[string](*ClassNode)
+    NodesByID  []*ClassNode
+    Root *ClassNode
 }
 
 type ClassNode struct {
@@ -183,6 +172,46 @@ type ClassNode struct {
     IsRoot   bool
     Repeat   *Repeat
 }
+
+// A representation of a genetic sequence using one byte letter per base.
+// A type synonym is used to differentiate one-byte-per-base sequences from two-bits-per-base sequences (type Seq), which also use the concrete type []byte.
+type TextSeq []byte
+
+/* A two-bits-per-base sequence of up to 31 bases, with low-order bits occupied first.
+   00 = 'a'
+   01 = 'c'
+   10 = 'g'
+   11 = 't'
+*/
+type KmerInt uint64
+type KmerInts []KmerInt
+
+// A two-bits-per-base sequence of up to 15 bases, with low-bits occupied first.
+type MinInt uint32
+type MinInts []MinInt
+
+/*
+   Indexes the base of a kmer that is the starting index of its minimizer.
+   If less than 32, the minimizer is the positive strand representation
+   Otherwise, the minimizer is the reverse complement of kmer[minkey%32 : minkey + (m%32)]
+*/
+type MinKey uint8
+
+// The first eight bits are the integer representation of the kmer's sequence (type KmerInt).
+// The last two are the LCA ID (type uint16).
+type Kmer [10]byte
+
+/*
+   Each base is represented by two bits.
+   High-order bits are occupied first.
+   Remember that Seq.Len is the number of bases contained, while len(Seq.Bytes) is the number of bytes necessary to represent them.
+*/
+type Seq struct {
+    Bytes []byte
+    Len   uint64
+}
+
+type Seqs []Seq
 
 // type synonyms, necessary to implement interfaces (e.g. sort) and methods
 type Kmers []Kmer
@@ -392,12 +421,12 @@ func New(config Config) (error, *RepeatGenome) {
 
     if config.MemProfile {
         os.Mkdir("profiles", os.ModeDir)
-        rg.memProfFile, err = os.Create("profiles/" + rg.Name + ".memprof")
+        memProfFile, err = os.Create("profiles/" + rg.Name + ".memprof")
         if err != nil {
             return IOError{"RepeatGenome.getKrakenSlice()", err}, nil
         }
-        pprof.WriteHeapProfile(rg.memProfFile)
-        defer rg.memProfFile.Close()
+        pprof.WriteHeapProfile(memProfFile)
+        defer memProfFile.Close()
     }
 
     err, rg.chroms = parseGenome(rg.Name)
@@ -478,7 +507,6 @@ func (rg *RepeatGenome) getRepeats() {
             repeat.ClassList = match.RepeatClass
             repeat.Name = match.RepeatName
             repeat.Instances = []*Match{match}
-            repeat.Locations = append(repeat.Locations, repeatLoc{match.SeqName, match.SeqStart, match.SeqEnd})
 
             rg.Repeats = append(rg.Repeats, repeat)
             rg.RepeatMap[repeat.Name] = &repeat

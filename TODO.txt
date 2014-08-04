@@ -17,9 +17,19 @@ comments skeptically - they will eventually be audited.
 Repeat.Instances is populated in an incorrect manner - it seems like it gets
 one per ClassNode. Repeat.Locations is also dubious.
 
+Are we storing everything we need to in the Kraken data file? Could some of the
+data that parsed libraries rely on (RepeatGenome.Matches, RepeatGenome.Repeats,
+etc.) be non-deterministic?
+
 Functions for pointer accesses?
 
+Ensure that Match.RepeatStart and Match.RepeatEnd are zero-indexed.
+
 A lot of explicit variable types could be safely removed.
+
+Consider renaming Kmer to KmerPair or KrakenPair.
+
+Consider making an LCA_ID type synonym.
 
 Non-exported globals or constants for bit offsets (e.g. that of a Kmer's LCA?)
 
@@ -38,10 +48,10 @@ Should make a flag to prevent writing Kraken library.
 
 Should probably make a file solely for type defs.
 
-Reads are currently kept in TextSeq form until the bitter end because, with Go's
-referenced based slices, there's no compelling reason not to, and because
-they're easier (and probably faster) to manipulate than Seqs. This may change at
-some point, though.
+Reads are currently kept in TextSeq form until the bitter end because, with
+Go's referenced based slices, there's no compelling reason not to, and because
+they're easier (and probably faster) to manipulate than Seqs. This may change
+at some point, though.
 
 If a minimizer is associated with a single repeat type, can we use that
 heuristically?
@@ -78,4 +88,5 @@ Kraken.)
 
 Int sizes should be reviewed for memory efficiency.
 
-The sole command line argument is the name of the reference genome (e.g. "dm3").
+The sole command line argument is the name of the reference genome (e.g.
+"dm3").

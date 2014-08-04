@@ -237,49 +237,6 @@ func (minInts MinInts) Less(i, j int) bool {
     return minInts[i] < minInts[j]
 }
 
-func (minPairs MinPairs) Len() int {
-    return len(minPairs)
-}
-
-func (minPairs MinPairs) Swap(i, j int) {
-    minPairs[i], minPairs[j] = minPairs[j], minPairs[i]
-}
-
-func (minPairs MinPairs) Less(i, j int) bool {
-    iMin := *(*MinInt)(unsafe.Pointer(&minPairs[i][8]))
-    jMin := *(*MinInt)(unsafe.Pointer(&minPairs[j][8]))
-    if iMin < jMin {
-        return true
-    } else if iMin > jMin {
-        return false
-    } else {
-        return *(*KmerInt)(unsafe.Pointer(&minPairs[i])) < *(*KmerInt)(unsafe.Pointer(&minPairs[j]))
-    }
-}
-
-/*
-func (fullKmers FullKmers) Len() int {
-    return len(fullKmers)
-}
-
-func (fullKmers FullKmers) Swap(i, j int) {
-    fullKmers[i], fullKmers[j] = fullKmers[j], fullKmers[i]
-}
-
-// could also just loop through bytes and compare, if the MinInt came first
-func (fullKmers FullKmers) Less(i, j int) bool {
-    iMin := *(*MinInt)(unsafe.Pointer(&fullKmers[i][8]))
-    jMin := *(*MinInt)(unsafe.Pointer(&fullKmers[j][8]))
-    if iMin < jMin {
-        return true
-    } else if iMin > jMin {
-        return false
-    } else {
-        return *(*KmerInt)(unsafe.Pointer(&fullKmers[i])) < *(*KmerInt)(unsafe.Pointer(&fullKmers[j]))
-    }
-}
-*/
-
 func boolToInt(a bool) int {
     if a {
         return 1

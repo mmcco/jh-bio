@@ -96,6 +96,13 @@ func DebugSeq() {
 
 func (rg *RepeatGenome) checkIntegrity() {
 
+    for i, match := rg.Matches {
+        if i != match.ID {
+            fmt.Println("ERROR: match at index", i, "has an ID that does not match its index")
+            os.Exit(1)
+        }
+    }
+
     for i := 1; i < len(rg.SortedMins); i++ {
         if rg.SortedMins[i] <= rg.SortedMins[i-1] {
             fmt.Println("ERROR: rg.SortedMins not sorted")
