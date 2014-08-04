@@ -10,7 +10,6 @@ import (
     "runtime/pprof"
     "strconv"
     "strings"
-    "sync"
 )
 
 // These variables are used ubiquitously, especially in performance-critical functions, so we grudgingly make them globals.

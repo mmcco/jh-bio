@@ -11,7 +11,6 @@ import (
     //"reflect"
     "strconv"
     "strings"
-    "sync"
     "unsafe"
 )
 
@@ -282,6 +281,6 @@ func zero(byteSlice []byte) {
     }
 }
 
-func (repeat Repeat) IsRoot() {
+func (repeat Repeat) IsRoot() bool {
     return repeat.ID == 0
 }

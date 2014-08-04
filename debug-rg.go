@@ -96,8 +96,8 @@ func DebugSeq() {
 
 func (rg *RepeatGenome) checkIntegrity() {
 
-    for i, match := rg.Matches {
-        if i != match.ID {
+    for i, match := range rg.Matches {
+        if uint64(i) != match.ID {
             fmt.Println("ERROR: match at index", i, "has an ID that does not match its index")
             os.Exit(1)
         }
