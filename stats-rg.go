@@ -20,14 +20,12 @@ func (rg *RepeatGenome) KmersGBSize() float64 {
 }
 
 func (rg *RepeatGenome) PercentRepeats() float64 {
-    var totalBases uint64 = rg.Size()
-
     var repeatBases uint64 = 0
     for _, match := range rg.Matches {
         repeatBases += match.SeqEnd - match.SeqStart
     }
 
-    return 100 * (float64(repeatBases) / float64(totalBases))
+    return 100 * (float64(repeatBases) / float64(rg.Size()))
 }
 
 func (match *Match) Size() uint64 {

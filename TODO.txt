@@ -14,6 +14,9 @@ after the reference genome used (e.g. "dm3") that contains the following files:
 Premature commenting is the root of all evil, and I have sinned. Please read
 comments skeptically - they will eventually be audited.
 
+Repeat.Instances is populated in an incorrect manner - it seems like it gets
+one per ClassNode. Repeat.Locations is also dubious.
+
 Functions for pointer accesses?
 
 A lot of explicit variable types could be safely removed.
