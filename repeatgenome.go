@@ -101,6 +101,8 @@ type Match struct {
     ID         uint64
 }
 
+type Matches []Match
+
 /*
    RepeatGenome.Name - The name of the reference genome, such as "dm3" or "hg38".
                        This is used to name created directories, and to find directories and files that may be read from, such as a stored Kraken library and reference sequences.
@@ -131,23 +133,44 @@ type RepeatGenome struct {
 
 /*
    Repeat.ID - A unique ID that we assign (not included in RepeatMasker output).
+               Because these are assigned in the order in which they are encountered in <genome name>.fa.out, they are not compatible across even different versions of the same reference genome. This may change.
    Repeat.Name - The repeat's fully qualified name, excluding root.
-   Repeat.ClassList - 
-   Repeat.ClassNode - 
-   Repeat.Instances - 
+   Repeat.ClassList - A slice of this Repeat's class ancestry from the top of the tree down, excluding root.
+   Repeat.ClassNode - A pointer to the ClassNode which corresponds to this repeat.
+   Repeat.Instances - A slice of pointers to all matches that are instances of this repeat.
 */
 type Repeat struct {
-    // assigned in simple incremented order starting from 1
-    // they are therefore not compatible across genomes
-    // we give root ID = 0
     ID uint64
     Name  string
-    // a list containing the repeat's ancestry path, from top down
-    // root is implicit, and is therefore excluded from the list
     ClassList []string
     ClassNode *ClassNode
     Instances []*Match
 }
+
+type Repeats []Repeat
+
+/*
+   ClassNode.Name - This ClassNode's fully qualified name, excluding root.
+   ClassNode.ID - A unique ID starting at 0 that we assign (not included in RepeatMasker output).
+                  Root has ID 0.
+   ClassNode.Class - This ClassNode's name cut on "/".
+                     This likely isn't necessary, and may be removed in the future.
+   ClassNode.Parent - A pointer to this ClassNode's parent in the ancestry tree.
+                      It should be nil for root and only for root.
+   ClassNode.Children - A slice containing pointers to all of this ClassNode's children in the tree.
+   ClassNode.Repeat - A pointer to this ClassNode's corresonding Repeat, if it has one.
+                      This field is of dubious value.
+*/
+type ClassNode struct {
+    Name     string
+    ID       uint16
+    Class    []string
+    Parent   *ClassNode
+    Children []*ClassNode
+    Repeat   *Repeat
+}
+
+type ClassNodes []*ClassNode
 
 /*
    ClassTree.ClassNodes - Maps a fully qualified class name (excluding root) to that class's ClassNode struct, if it exists.
@@ -161,16 +184,6 @@ type ClassTree struct {
     ClassNodes map[string](*ClassNode)
     NodesByID  []*ClassNode
     Root *ClassNode
-}
-
-type ClassNode struct {
-    Name     string
-    ID       uint16
-    Class    []string
-    Parent   *ClassNode
-    Children []*ClassNode
-    IsRoot   bool
-    Repeat   *Repeat
 }
 
 // A representation of a genetic sequence using one byte letter per base.
@@ -200,6 +213,8 @@ type MinKey uint8
 // The first eight bits are the integer representation of the kmer's sequence (type KmerInt).
 // The last two are the LCA ID (type uint16).
 type Kmer [10]byte
+type Kmers []Kmer
+type PKmers []*Kmer
 
 /*
    Each base is represented by two bits.
@@ -213,23 +228,7 @@ type Seq struct {
 
 type Seqs []Seq
 
-// type synonyms, necessary to implement interfaces (e.g. sort) and methods
-type Kmers []Kmer
-type PKmers []*Kmer
-type MinMap map[MinInt]Kmers
-type Repeats []Repeat
-type Matches []Match
-type ClassNodes []*ClassNode
-
 type Chroms map[string](map[string]TextSeq)
-
-type ThreadResponse struct {
-    KmerInt   KmerInt
-    MinInt    MinInt
-    Relative *ClassNode
-}
-
-type MinCache map[KmerInt]MinInt
 
 func parseMatches(genomeName string) (error, Matches) {
     // "my_genome_name"  ->  "my_genome_name/my_genome_name.fa.out"
@@ -521,7 +520,7 @@ func (rg *RepeatGenome) getClassTree() {
     tree := &rg.ClassTree
     tree.ClassNodes = make(map[string](*ClassNode))
     // would be prettier if expanded
-    tree.Root = &ClassNode{"root", 0, []string{"root"}, nil, nil, true, nil}
+    tree.Root = &ClassNode{"root", 0, []string{"root"}, nil, nil, nil}
     tree.ClassNodes["root"] = tree.Root
     tree.NodesByID = append(tree.NodesByID, tree.Root)
 
@@ -539,7 +538,6 @@ func (rg *RepeatGenome) getClassTree() {
                 classNode.Name = thisClassName
                 classNode.ID = uint16(len(tree.NodesByID))
                 classNode.Class = thisClass
-                classNode.IsRoot = false
                 if repeat, exists := rg.RepeatMap[thisClassName]; exists {
                     classNode.Repeat = repeat
                 }

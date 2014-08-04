@@ -65,33 +65,6 @@ func comma(v uint64) string {
     return sign + strings.Join(parts[j:len(parts)], ",")
 }
 
-func mergeThreadResp(cs [](chan ThreadResponse)) <-chan ThreadResponse {
-    var wg sync.WaitGroup
-    //elemType := reflect.TypeOf(cs).Elem()
-    //chanType := reflect.ChanOf(RecvDir, elemType)
-    out := make(chan ThreadResponse)
-
-    // Start an output goroutine for each input channel in cs.  output
-    // copies values from c to out until c is closed, then calls wg.Done.
-    wg.Add(len(cs))
-    for _, c := range cs {
-        go func(c chan ThreadResponse) {
-            for n := range c {
-                    out <- n
-            }
-            wg.Done()
-        }(c)
-    }
-
-    // Start a goroutine to close out once all the output goroutines are
-    // done.  This must start after the wg.Add call.
-    go func() {
-        wg.Wait()
-        close(out)
-    }()
-    return out
-}
-
 // returns the number of lines and a slice of the lines
 func lines(byteSlice []byte) [][]byte {
     var lines [][]byte = bytes.Split(byteSlice, []byte{'\n'})
@@ -307,4 +280,8 @@ func zero(byteSlice []byte) {
     for i := range byteSlice {
         byteSlice[i] = 0
     }
+}
+
+func (repeat Repeat) IsRoot() {
+    return repeat.ID == 0
 }
