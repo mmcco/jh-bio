@@ -29,6 +29,8 @@ A lot of explicit variable types could be safely removed.
 
 Consider renaming Kmer to KmerPair or KrakenPair.
 
+Could populate RepeatGenome.ClassTree.ClassNodes in a separate loop.
+
 Consider making an LCA_ID type synonym.
 
 Non-exported globals or constants for bit offsets (e.g. that of a Kmer's LCA?)
@@ -85,8 +87,6 @@ We should also review how to deal with m <= len(match) < k.
 For caching efficiency, we should change the minimizer data structure to a
 map-indexed 1D slice of Kmers (not *Kmers). (This technique originated in
 Kraken.)
-
-Int sizes should be reviewed for memory efficiency.
 
 The sole command line argument is the name of the reference genome (e.g.
 "dm3").
