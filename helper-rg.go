@@ -38,7 +38,7 @@ func (ioError IOError) Error() string {
 
 // Courtesy of https://github.com/dustin/go-humanize
 // Returns a string representing the int, with commas for readability.
-func comma(v uint64) string {
+func comma(v int) string {
     sign := ""
     if v < 0 {
         sign = "-"
@@ -60,15 +60,14 @@ func comma(v uint64) string {
         j--
     }
     parts[j] = strconv.Itoa(int(v))
-    return sign + strings.Join(parts[j:len(parts)], ",")
+    return sign + strings.Join(parts[j:], ",")
 }
 
 // returns the number of lines and a slice of the lines
 func lines(byteSlice []byte) [][]byte {
     var lines [][]byte = bytes.Split(byteSlice, []byte{'\n'})
-    // drop the trailing newlines
-    newline := []byte("\n")
-    for lastLine := lines[len(lines)-1]; len(lines) > 0 && (len(lastLine) == 0 || bytes.Equal(lastLine, newline)); lastLine = lines[len(lines)-1] {
+    // drop trailing empty lines
+    for len(lines) > 0 && len(lines[len(lines)-1]) == 0 {
         lines = lines[:len(lines)-1]
     }
     return lines
@@ -251,10 +250,10 @@ func ceilDiv(a, b int) int {
     return ((a - 1) / b) + 1
 }
 
-// assumes that rg.MinCounts and rg.SortedMins are populated
+// Assumes that rg.MinCounts and rg.SortedMins are populated.
 func (rg *RepeatGenome) populateMinOffsets() {
     if rg.MinOffsets != nil && len(rg.MinOffsets) > 0 {
-        fmt.Println("!!! WARNING !!! RepeatGenome.populateMinOffsets overwriting previous map")
+        fmt.Println("!!! WARNING !!! RepeatGenome.populateMinOffsets overwriting previous non-empty value")
     }
 
     rg.MinOffsets = make([]int64, minSliceSize, minSliceSize)
