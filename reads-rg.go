@@ -106,7 +106,7 @@ func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs []TextSeq, responseChan c
    Each read-classifying goroutine is given a unique response chan.
    These are then merged into a single response chan, which is the return value.
 */
-func (rg *RepeatGenome) GetReadClassChan(reads []TextSeq) chan ReadResponse {
+func (rg *RepeatGenome) GetQuickClassChan(reads []TextSeq) chan ReadResponse {
     responseChans := make([]chan ReadResponse, 0, numCPU)
 
     // dispatch one read-classifying goroutine per CPU
@@ -115,6 +115,40 @@ func (rg *RepeatGenome) GetReadClassChan(reads []TextSeq) chan ReadResponse {
         startInd := i * (len(reads) / numCPU)
         endInd := ((i + 1) * len(reads)) / numCPU
         go rg.QuickClassifyReads(reads[startInd:endInd], responseChans[i])
+    }
+
+    // the rest of this function is spent merging the response chans
+    var wg sync.WaitGroup
+    wg.Add(len(responseChans))
+    master := make(chan ReadResponse)
+
+    for _, respChan := range responseChans {
+        // need respChan argument to prevent all goroutines from using same instance of respChan - language quirk
+        go func(respChan chan ReadResponse) {
+            for resp := range respChan {
+                master <- resp
+            }
+            wg.Done()
+        }(respChan)
+    }
+
+    go func() {
+        wg.Wait()
+        close(master)
+    }()
+
+    return master
+}
+
+func (rg *RepeatGenome) GetLCAClassChan(reads []TextSeq) chan ReadResponse {
+    responseChans := make([]chan ReadResponse, 0, numCPU)
+
+    // dispatch one read-classifying goroutine per CPU
+    for i := 0; i < numCPU; i++ {
+        responseChans = append(responseChans, make(chan ReadResponse, 50))
+        startInd := i * (len(reads) / numCPU)
+        endInd := ((i + 1) * len(reads)) / numCPU
+        go rg.LCA_ClassifyReads(reads[startInd:endInd], responseChans[i])
     }
 
     // the rest of this function is spent merging the response chans
@@ -149,7 +183,7 @@ func (rg *RepeatGenome) GetReadClassChan(reads []TextSeq) chan ReadResponse {
    However, we will used a FASTQ reader when we get past the initial testing phase.
    This could be done concurrently, considering how many disk accesses there are.
 */
-func (rg *RepeatGenome) GetClassChanProc() (error, chan ReadResponse) {
+func (rg *RepeatGenome) GetProcReads() (error, []TextSeq) {
     workingDirName, err := os.Getwd()
     if err != nil {
         return err, nil
@@ -183,10 +217,10 @@ func (rg *RepeatGenome) GetClassChanProc() (error, chan ReadResponse) {
         }
     }
 
-    return nil, rg.GetReadClassChan(reads)
+    return nil, reads
 }
 
-func (rg *RepeatGenome) GetClassChanSAM() (error, chan ReadResponse) {
+func (rg *RepeatGenome) GetSAMReads() (error, []TextSeq) {
     workingDirName, err := os.Getwd()
     if err != nil {
         return err, nil
@@ -232,5 +266,5 @@ func (rg *RepeatGenome) GetClassChanSAM() (error, chan ReadResponse) {
         }
     }
 
-    return nil, rg.GetReadClassChan(reads)
+    return nil, reads
 }
