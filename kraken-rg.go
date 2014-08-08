@@ -296,8 +296,8 @@ func (rg *RepeatGenome) genKrakenLib() {
     fmt.Println("beginning first pass")
     numRawKmers, numRawMins, rawMinCounts := rg.krakenFirstPass()
 
-    fmt.Println("expecting", comma(numRawMins), "unique minimizers")
-    fmt.Println("expecting", comma(numRawKmers), "non-unique kmers")
+    fmt.Println("expecting", comma(int(numRawMins)), "unique minimizers")
+    fmt.Println("expecting", comma(int(numRawKmers)), "non-unique kmers")
     fmt.Println()
 
     // populate a list of sorted minimizers
@@ -312,13 +312,13 @@ func (rg *RepeatGenome) genKrakenLib() {
     fmt.Println("Beginning sorting RepeatGenome.SortedMins")
     sort.Sort(rg.SortedMins)
     fmt.Println("RepeatGenome.SortedMins sorted")
-    fmt.Println("len(rg.SortedMins):", len(rg.SortedMins))
+    fmt.Println("len(rg.SortedMins):", comma(len(rg.SortedMins)))
     fmt.Println()
 
     fmt.Println("generating rawKmers and locMap")
     rawKmers := rg.getRawKmers(numRawKmers, rawMinCounts)
     runtime.GC() // manual memory clear
-    fmt.Println("raw kmers slice generated - len =", comma(uint64(len(rawKmers))))
+    fmt.Println("raw kmers slice generated - len =", comma(len(rawKmers)))
 
     if debug {
         rawKmers.checkIntegrity()
@@ -334,7 +334,7 @@ func (rg *RepeatGenome) genKrakenLib() {
     rg.uniqKmers(rawKmers)
     fmt.Println("done generating RepeatGenome.Kmers")
 
-    fmt.Println(comma(uint64(len(rg.Kmers))), "unique kmers processed")
+    fmt.Println(comma(len(rg.Kmers)), "unique kmers processed")
 
     rawKmers = nil
     runtime.GC()

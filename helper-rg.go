@@ -49,7 +49,7 @@ func comma(v int) string {
     j := len(parts) - 1
 
     for v > 999 {
-        parts[j] = strconv.FormatUint(v%1000, 10)
+        parts[j] = strconv.FormatInt(int64(v%1000), 10)
         switch len(parts[j]) {
         case 2:
             parts[j] = "0" + parts[j]
@@ -59,7 +59,7 @@ func comma(v int) string {
         v = v / 1000
         j--
     }
-    parts[j] = strconv.Itoa(int(v))
+    parts[j] = strconv.Itoa(v)
     return sign + strings.Join(parts[j:], ",")
 }
 
