@@ -105,8 +105,9 @@ func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs []TextSeq, responseChan c
    Dispatches as many read-classifying goroutines as there are CPUs, giving each a subslice of the slice of reads provided.
    Each read-classifying goroutine is given a unique response chan.
    These are then merged into a single response chan, which is the return value.
+   The useLCA parameter determines whether to use Quick or LCA read classification logic.
 */
-func (rg *RepeatGenome) GetQuickClassChan(reads []TextSeq) chan ReadResponse {
+func (rg *RepeatGenome) GetClassChan(reads []TextSeq, useLCA bool) chan ReadResponse {
     responseChans := make([]chan ReadResponse, 0, numCPU)
 
     // dispatch one read-classifying goroutine per CPU
@@ -114,41 +115,11 @@ func (rg *RepeatGenome) GetQuickClassChan(reads []TextSeq) chan ReadResponse {
         responseChans = append(responseChans, make(chan ReadResponse, 50))
         startInd := i * (len(reads) / numCPU)
         endInd := ((i + 1) * len(reads)) / numCPU
-        go rg.QuickClassifyReads(reads[startInd:endInd], responseChans[i])
-    }
-
-    // the rest of this function is spent merging the response chans
-    var wg sync.WaitGroup
-    wg.Add(len(responseChans))
-    master := make(chan ReadResponse)
-
-    for _, respChan := range responseChans {
-        // need respChan argument to prevent all goroutines from using same instance of respChan - language quirk
-        go func(respChan chan ReadResponse) {
-            for resp := range respChan {
-                master <- resp
-            }
-            wg.Done()
-        }(respChan)
-    }
-
-    go func() {
-        wg.Wait()
-        close(master)
-    }()
-
-    return master
-}
-
-func (rg *RepeatGenome) GetLCAClassChan(reads []TextSeq) chan ReadResponse {
-    responseChans := make([]chan ReadResponse, 0, numCPU)
-
-    // dispatch one read-classifying goroutine per CPU
-    for i := 0; i < numCPU; i++ {
-        responseChans = append(responseChans, make(chan ReadResponse, 50))
-        startInd := i * (len(reads) / numCPU)
-        endInd := ((i + 1) * len(reads)) / numCPU
-        go rg.LCA_ClassifyReads(reads[startInd:endInd], responseChans[i])
+        if useLCA {
+            go rg.LCA_ClassifyReads(reads[startInd:endInd], responseChans[i])
+        } else {
+            go rg.QuickClassifyReads(reads[startInd:endInd], responseChans[i])
+        }
     }
 
     // the rest of this function is spent merging the response chans

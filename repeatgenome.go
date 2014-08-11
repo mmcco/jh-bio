@@ -453,21 +453,21 @@ func New(config Config) (error, *RepeatGenome) {
         }
     } else {
         minsFile, err := os.OpenFile(rg.Name+".mins", os.O_RDONLY, 0400)
-        // implies the file already exists
-        if err == nil {
+
+        if err == nil {    // implies the file already exists
             fmt.Println("\nKraken library file exists - using contents")
             err = rg.ReadKraken(minsFile)
             if err != nil {
                 return IOError{"Kmers.ReadKraken()", err}, nil
             }
-        } else if os.IsNotExist(err) { // the case that there isn't a written file yet
+        } else if os.IsNotExist(err) {    // the case that there isn't a written file yet
             fmt.Println("Kraken library file doesn't exist - generating library\n")
             rg.genKrakenLib()
             err = rg.WriteKraken()
             if err != nil {
                 return err, nil
             }
-        } else { // otherwise we're dealing with a generic error of some sort
+        } else {    // otherwise we're dealing with a generic error of some sort
             return err, nil
         }
     }
@@ -478,7 +478,7 @@ func New(config Config) (error, *RepeatGenome) {
             return err, nil
         }
 
-        rg.WriteClassJSON(false, false)
+        err := rg.WriteClassJSON(false, false)
         if err != nil {
             return err, nil
         }
