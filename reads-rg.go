@@ -191,6 +191,9 @@ func (rg *RepeatGenome) GetProcReads() (error, []TextSeq) {
     return nil, reads
 }
 
+/*
+   
+*/
 func (rg *RepeatGenome) GetSAMReads() (error, []TextSeq) {
     workingDirName, err := os.Getwd()
     if err != nil {
@@ -222,7 +225,7 @@ func (rg *RepeatGenome) GetSAMReads() (error, []TextSeq) {
         }
         // drop header
         if len(readsBytes) < 3 {
-            return ParseError{"RepeatGenome.GetClassChanSAM", fileinfo.Name(), fmt.Errorf("too few line in SAM file - header missing")}, nil
+            return ParseError{"RepeatGenome.GetSAMReads", fileinfo.Name(), fmt.Errorf("too few lines in SAM file - header missing")}, nil
         } else {
             readsBytes = readsBytes[3:]
         }
@@ -230,7 +233,7 @@ func (rg *RepeatGenome) GetSAMReads() (error, []TextSeq) {
         for _, lineBytes := range readsBytes {
             fields := bytes.Fields(lineBytes)
             if len(fields) != 12 {
-                return ParseError{"RepeatGenome.GetClassChanSAM", fileinfo.Name(), fmt.Errorf("too few fields in SAM file line")}, nil
+                return ParseError{"RepeatGenome.GetSAMReads", fileinfo.Name(), fmt.Errorf("too few fields in SAM file line")}, nil
             } else {
                 reads = append(reads, TextSeq(bytes.ToLower(fields[9])))
             }

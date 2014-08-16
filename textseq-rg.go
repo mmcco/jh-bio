@@ -1,15 +1,22 @@
 package repeatgenome
 
-// Somewhat archaic functions that deal solely with TextSeq
-// These operations are far slower than the equivalents performed on the corresponding int types.
-// They therefore generally shouldn't be used.
+/*
+   Somewhat archaic functions that deal solely with TextSeq
+   These operations are far slower than the equivalents performed on the corresponding int types.
+   They therefore generally shouldn't be used.
 
-// A representation of a genetic sequence using one byte letter per base.
-// A type synonym is used to differentiate one-byte-per-base sequences from two-bits-per-base sequences (type Seq), which also use the concrete type []byte.
+   A representation of a genetic sequence using one byte letter per base.
+   A type synonym is used to differentiate one-byte-per-base sequences from two-bits-per-base sequences (type Seq), which also use the concrete type []byte.
+*/
 type TextSeq []byte
 
+/*
+   Returns the reverse complement of the supplied TextSeq.
+   This drains memory and should therefore not be used outside of debugging and printing.
+*/
 func (seq TextSeq) revComp() TextSeq {
     var revCompSeq = make(TextSeq, 0, len(seq))
+
     for i := range seq {
         switch seq[len(seq)-i-1] {
         case 'a':
@@ -31,17 +38,12 @@ func (seq TextSeq) revComp() TextSeq {
     return revCompSeq
 }
 
-// The logic for determining the minimizer
-// Currently, it uses simple lexicographic ordering
-// The function's name allows it to be used in a sort.Interface implementation, if we ever need one.
-func (a TextSeq) Less(b TextSeq) bool {
-    // min function manually inlined for speed - dubious
-    var size int
-    if len(a) < len(b) {
-        size = len(a)
-    } else {
-        size = len(b)
-    }
+/* 
+   Returns a bool describing whether the first TextSeq is lexicographically smaller than the second.
+*/
+func Less(a, b TextSeq) bool {
+    size := min(len(a), len(b))
+
     for i := 0; i < size; i++ {
         if a[i] < b[i] {
             return true
@@ -50,5 +52,6 @@ func (a TextSeq) Less(b TextSeq) bool {
             return false
         }
     }
-    return false
+
+    return len(a) < len(b)
 }
