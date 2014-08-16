@@ -8,6 +8,11 @@ import (
     "unsafe"
 )
 
+/*
+   Returns a pointer the the LCA of the two supplied ClassNode in the ClassTree.
+   Currently uses a simple pointer-walking algorithm.
+   This is a performance-critical function, and a location for potential optimization.
+*/
 func (classTree *ClassTree) getLCA(cnA, cnB *ClassNode) *ClassNode {
     for cnBWalker := cnB; cnBWalker != classTree.Root; cnBWalker = cnBWalker.Parent {
         for cnAWalker := cnA; cnAWalker != classTree.Root; cnAWalker = cnAWalker.Parent {
@@ -19,6 +24,10 @@ func (classTree *ClassTree) getLCA(cnA, cnB *ClassNode) *ClassNode {
     return classTree.Root
 }
 
+/*
+    Finds the ClassNode associated with a Kmer in the Kraken library.
+    Part of the core Kraken read-classification functionality.
+*/
 func (rg *RepeatGenome) getKmerLCA(kmerInt KmerInt) *ClassNode {
     minimizer := kmerInt.Minimize()
 
@@ -43,7 +52,9 @@ func (rg *RepeatGenome) getKmerLCA(kmerInt KmerInt) *ClassNode {
     return nil
 }
 
-// Could probably use a map to prevent duplicates in the future, although this wouldn't make a difference if the slice size were still manually chosen
+/*
+   Pushes all minimizers of all kmers of each Match in the supplied slice to the supplied chan.
+*/
 func (rg *RepeatGenome) getRawMins(matchChan chan *Match, respChan chan MinInt, wg *sync.WaitGroup) {
     k_ := uint64(k)
     for match := range matchChan {
@@ -68,18 +79,25 @@ func (rg *RepeatGenome) getRawMins(matchChan chan *Match, respChan chan MinInt, 
                 }
             }
 
-            respChan <- TextSeq(matchSeq[i : i+k_]).kmerInt().canonicalRepr().Minimize()
+            respChan <- TextSeq(matchSeq[i : i+k_]).kmerInt().Minimize()
         }
     }
     wg.Done()
 }
 
+/*
+   The type returned by RepeatGenome.getMatchKmers(), which process raw kmers.
+   The LCA contained in the Kmer value is not the Kmer's final LCA, but simply the ClassNode ID of the match this instance of the Kmer came from.
+*/
 type ResponsePair struct {
     Kmer   Kmer
     MinInt MinInt
 }
 
-// Could probably use a map to prevent duplicates in the future, although this wouldn't make a difference if the slice size were still manually chosen
+/*
+   Pushes all Kmers, along with their minimizers and the ClassNode ID of the match instance the kmer came from.
+   As mentioned above, note that at this point the Kmer's LCA field contains the ClassNode ID of the match processed, not the Kmer's final LCA ID.
+*/
 func (rg *RepeatGenome) getMatchKmers(matchChan chan *Match, respChan chan ResponsePair, wg *sync.WaitGroup) {
     k_ := uint64(k)
     for match := range matchChan {
@@ -90,11 +108,11 @@ func (rg *RepeatGenome) getMatchKmers(matchChan chan *Match, respChan chan Respo
             continue
         }
         // includes kmers containing n's, which are ignored
-        numKmers := end - start - k_ + 1
+        numRawKmers := end - start - k_ + 1
 
         var i uint64
     KmerLoop:
-        for i = 0; i < numKmers; i++ {
+        for i = 0; i < numRawKmers; i++ {
 
             var j int64
             for j = int64(k_) - 1; j >= 0; j-- {
@@ -114,7 +132,12 @@ func (rg *RepeatGenome) getMatchKmers(matchChan chan *Match, respChan chan Respo
     wg.Done()
 }
 
-// we first count the number of non-unique kmers and the number of non-unique minimizers associated with each kmer
+/*
+   This is the first step of Kraken library generation.
+   While it minimizes all repeat sequences genome, it only returns various counts, which are used for memory-allocation efficiency.
+   It counts the number of raw (non-unique and possibly n-containing) kmers and the number of unique minimizers.
+   It also returns a slice containing the number of times each minimizer appears in the genome.
+*/
 func (rg *RepeatGenome) krakenFirstPass() (numRawKmers uint64, numRawMins uint64, rawMinCounts []uint32) {
     matchChan := make(chan *Match)
     go func() {
@@ -151,6 +174,11 @@ func (rg *RepeatGenome) krakenFirstPass() (numRawKmers uint64, numRawMins uint64
     return numRawKmers, numRawMins, rawMinCounts
 }
 
+/*
+   Sorts a slice of Kmers that are already sorted by minimizer.
+   The resulting slice is therefore sorted primarily by minimizer and secondarily by kmer.
+   This is done concurrently, using goroutines to sort each minimizer's kmers as a unique slice.
+*/
 func (rg *RepeatGenome) sortRawKmers(rawKmers Kmers, rawMinCounts []uint32) {
     wg := new(sync.WaitGroup)
     wg.Add(numCPU)
@@ -183,6 +211,9 @@ func (rg *RepeatGenome) sortRawKmers(rawKmers Kmers, rawMinCounts []uint32) {
     wg.Wait()
 }
 
+/*
+   Returns a slice of all kmers in the genome's repeat sequences, unsorted and non-unique.
+*/
 func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts []uint32) Kmers {
     // we need a map telling us the next place to insert a kmer associated with any given minimizer
     // we simply increment a minimizer's offset when we insert a kmer associated with it

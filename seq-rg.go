@@ -62,7 +62,7 @@ func (seq TextSeq) minInt() MinInt {
 }
 
 /*
-   Return the reverse complement of a KmerInt.
+   Returns the reverse complement of a KmerInt.
 */
 func (kmerInt KmerInt) revComp() KmerInt {
     var revComp KmerInt
@@ -76,7 +76,7 @@ func (kmerInt KmerInt) revComp() KmerInt {
 }
 
 /*
-   Return the reverse complement of a MinInt
+   Returns the reverse complement of a MinInt.
 */
 func (minInt MinInt) revComp() MinInt {
     var revComp MinInt

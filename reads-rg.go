@@ -12,7 +12,7 @@ import (
 )
 
 /*
-   The type sent back from read-classifying goroutines of the function RepeatGenome.ClassifyReads
+   The type sent back from read-classifying goroutines of RepeatGenome.ClassifyReads()
 */
 type ReadResponse struct {
     Seq       TextSeq
