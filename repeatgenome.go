@@ -478,7 +478,7 @@ func New(config Config) (error, *RepeatGenome) {
             return err, nil
         }
 
-        err := rg.WriteClassJSON(false, false)
+        err = rg.WriteClassJSON(false, false)
         if err != nil {
             return err, nil
         }
