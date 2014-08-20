@@ -72,7 +72,7 @@ func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs []TextSeq, responseChan c
         k_ := int64(k)
         numKmers := int64(len(read)) - k_ + 1
 
-        var lca *ClassNode = nil
+        var class *ClassNode = nil
         var i int64
     KmerLoop:
         for i = 0; i < numKmers; i++ {
@@ -86,17 +86,17 @@ func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs []TextSeq, responseChan c
 
             kmerBytes := read[i : i+k_]
             kmerInt := kmerBytes.kmerInt().canonicalRepr()
-            kmerLCA := rg.getKmerLCA(kmerInt)
+            kmerClass := rg.getKmerLCA(kmerInt)
 
-            if kmerLCA != nil {
-               if lca == nil {
-                   lca = kmerLCA
+            if kmerClass != nil {
+               if class == nil {
+                   class = kmerClass
                } else {
-                   lca = rg.ClassTree.getLCA(lca, kmerLCA)
+                   class = rg.ClassTree.getLCA(class, kmerClass)
                 }
             }
         }
-        responseChan <- ReadResponse{read, lca}
+        responseChan <- ReadResponse{read, class}
     }
     close(responseChan)
 }

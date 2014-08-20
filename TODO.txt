@@ -15,13 +15,15 @@ Premature commenting is the root of all evil, and I have sinned. Please read
 comments skeptically - they will eventually be audited.
 
 Repeat.Instances is populated in an incorrect manner - it seems like it gets
-one per ClassNode. Repeat.Locations is also dubious.
+one per ClassNode.
 
 Are we storing everything we need to in the Kraken data file? Could some of the
 data that parsed libraries rely on (RepeatGenome.Matches, RepeatGenome.Repeats,
 etc.) be non-deterministic?
 
 Functions for pointer accesses?
+
+Reconcile numRawKmers() and krakenFirstPass(), determine when to filter 'n's.
 
 Ensure that Match.RepeatStart and Match.RepeatEnd are zero-indexed.
 
@@ -80,9 +82,7 @@ available.
 
 All sequences containing Ns are currently ignored.
 
-We should consider taking end minimizers once the code base is more mature.
-
-We should also review how to deal with m <= len(match) < k.
+We should review how to deal with m <= len(match) < k.
 
 For caching efficiency, we should change the minimizer data structure to a
 map-indexed 1D slice of Kmers (not *Kmers). (This technique originated in

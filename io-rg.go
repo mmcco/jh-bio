@@ -32,9 +32,9 @@ func (repeatGenome *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) e
         return IOError{"RepeatGenome.WriteClassJSON()", err}
     }
 
-    classToCount := make(map[uint16]uint64)
+    classToCount := make(map[ClassID]uint64)
     for i := range repeatGenome.Kmers {
-        lcaID := *(*uint16)(unsafe.Pointer(&repeatGenome.Kmers[i][8]))
+        lcaID := *(*ClassID)(unsafe.Pointer(&repeatGenome.Kmers[i][8]))
         classToCount[lcaID]++
     }
 
@@ -58,7 +58,7 @@ func (repeatGenome *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) e
     return nil
 }
 
-func (classTree *ClassTree) jsonRecPopulate(jsonNode *JSONNode, classToCount map[uint16]uint64) {
+func (classTree *ClassTree) jsonRecPopulate(jsonNode *JSONNode, classToCount map[ClassID]uint64) {
     classNode := classTree.ClassNodes[jsonNode.Name]
     for i := range classNode.Children {
         child := new(JSONNode)
@@ -121,7 +121,7 @@ func (rg *RepeatGenome) WriteMins() error {
         }
         for _, kmer := range rg.getMinsKmers(thisMin) {
             kmerSeqInt := *(*KmerInt)(unsafe.Pointer(&kmer[0]))
-            lcaID := *(*uint16)(unsafe.Pointer(&kmer[8]))
+            lcaID := *(*ClassID)(unsafe.Pointer(&kmer[8]))
             fillKmerBuf(kmerBuf, kmerSeqInt)
             _, err = fmt.Fprintf(writer, "\t%s %s\n", kmerBuf, rg.ClassTree.NodesByID[lcaID].Name)
             if err != nil {

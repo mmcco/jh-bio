@@ -41,7 +41,7 @@ func (rg *RepeatGenome) getKmerLCA(kmerInt KmerInt) *ClassNode {
         x := (j + i) / 2
         thisKmerInt := *(*KmerInt)(unsafe.Pointer(&rg.Kmers[x]))
         if thisKmerInt == kmerInt {
-            return rg.ClassTree.NodesByID[*(*uint16)(unsafe.Pointer(&rg.Kmers[x][8]))] // get kmer's LCA ID and return the corresponding ClassNode
+            return rg.ClassTree.NodesByID[*(*ClassID)(unsafe.Pointer(&rg.Kmers[x][8]))] // get kmer's LCA ID and return the corresponding ClassNode
         } else if thisKmerInt < kmerInt {
             i = x + 1
         } else {
@@ -125,7 +125,7 @@ func (rg *RepeatGenome) getMatchKmers(matchChan chan *Match, respChan chan Respo
             kmerInt := TextSeq(matchSeq[i : i+k_]).kmerInt().canonicalRepr()
             var kmer Kmer
             *(*KmerInt)(unsafe.Pointer(&kmer)) = kmerInt
-            *(*uint16)(unsafe.Pointer(&kmer[8])) = match.ClassNode.ID
+            *(*ClassID)(unsafe.Pointer(&kmer[8])) = match.ClassNode.ID
             respChan <- ResponsePair{kmer, kmerInt.Minimize()}
         }
     }
@@ -258,7 +258,7 @@ func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts []uint32) K
 }
 
 type ReducePair struct {
-    LcaPtr *uint16
+    LcaPtr *ClassID
     Set    Kmers
 }
 
@@ -292,12 +292,12 @@ func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
         go func() {
             for pair := range pairChan {
                 // grab the LCA of the first kmer in this set, and use it as our starting point
-                lcaID := *(*uint16)(unsafe.Pointer(&pair.Set[0][8]))
+                lcaID := *(*ClassID)(unsafe.Pointer(&pair.Set[0][8]))
                 currLCA := rg.ClassTree.NodesByID[lcaID]
 
                 // loop through the rest, updating currLCA
                 for i := 1; i < len(pair.Set); i++ {
-                    lcaID = *(*uint16)(unsafe.Pointer(&pair.Set[i][8]))
+                    lcaID = *(*ClassID)(unsafe.Pointer(&pair.Set[i][8]))
                     currLCA = rg.ClassTree.getLCA(currLCA, rg.ClassTree.NodesByID[lcaID])
                 }
 
@@ -316,7 +316,7 @@ func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
             end++
         }
         rg.Kmers = append(rg.Kmers, rawKmers[start])
-        lcaPtr := (*uint16)(unsafe.Pointer(&rg.Kmers[len(rg.Kmers)-1][8]))
+        lcaPtr := (*ClassID)(unsafe.Pointer(&rg.Kmers[len(rg.Kmers)-1][8]))
         pairChan <- ReducePair{lcaPtr, rawKmers[start:end]}
     }
 

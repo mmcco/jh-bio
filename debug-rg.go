@@ -19,8 +19,8 @@ func (rg *RepeatGenome) printSample(numMins, numKmers int) {
         for _, kmer := range theseKmers {
             fmt.Print("\t")
             (*(*KmerInt)(unsafe.Pointer(&kmer))).print()
-            lca_ID := *(*uint16)(unsafe.Pointer(&kmer[8]))
-            fmt.Printf("\t%s\n", rg.ClassTree.NodesByID[lca_ID].Name)
+            classID := *(*ClassID)(unsafe.Pointer(&kmer[8]))
+            fmt.Printf("\t%s\n", rg.ClassTree.NodesByID[classID].Name)
         }
     }
 }

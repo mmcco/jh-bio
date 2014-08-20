@@ -274,6 +274,6 @@ func (kmer Kmer) Int() KmerInt {
    A more declarative and modifiable accessor function.
    While it would almost certainly be inlined, this is such a performance-critical operation that this function isn't currently used.
 */
-func (kmer Kmer) LCA_ID() uint16 {
-    return *(*uint16)(unsafe.Pointer(&kmer[8]))
+func (kmer Kmer) ClassID() ClassID {
+    return *(*ClassID)(unsafe.Pointer(&kmer[8]))
 }

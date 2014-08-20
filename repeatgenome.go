@@ -151,7 +151,7 @@ type Repeat struct {
     Instances []*Match
 }
 
-type Repeats []Repeat
+type Repeats []*Repeat
 
 /*
    ClassNode.Name - This ClassNode's fully qualified name, excluding root.
@@ -167,7 +167,7 @@ type Repeats []Repeat
 */
 type ClassNode struct {
     Name     string
-    ID       uint16
+    ID       ClassID
     Class    []string
     Parent   *ClassNode
     Children []*ClassNode
@@ -211,9 +211,15 @@ type MinInts []MinInt
 type MinKey uint8
 
 /*
+   A type synonym representing a ClassNode by ID.
+   Used to space-efficiently store a read's classification.
+*/
+type ClassID uint16
+
+/*
    This is what is stored by the main Kraken data structure: RepeatGenome.Kmers
    The first eight bits are the integer representation of the kmer's sequence (type KmerInt).
-   The last two are the LCA ID (type uint16).
+   The last two are the class ID (type ClassID).
 */
 type Kmer [10]byte
 type Kmers []Kmer
@@ -514,7 +520,7 @@ func (rg *RepeatGenome) getRepeats() {
                 Instances: []*Match{match},
             }
 
-            rg.Repeats = append(rg.Repeats, repeat)
+            rg.Repeats = append(rg.Repeats, &repeat)
             rg.RepeatMap[repeat.Name] = &repeat
 
             match.Repeat = &repeat
@@ -550,7 +556,7 @@ func (rg *RepeatGenome) getClassTree() {
                 }
                 classNode := new(ClassNode)
                 classNode.Name = thisClassName
-                classNode.ID = uint16(len(tree.NodesByID))
+                classNode.ID = ClassID(len(tree.NodesByID))
                 classNode.Class = thisClass
                 if repeat, exists := rg.RepeatMap[thisClassName]; exists {
                     classNode.Repeat = repeat
@@ -575,7 +581,7 @@ func (rg *RepeatGenome) getClassTree() {
 
     // MUST NOT USE RANGE - the struct will be copied!
     for i := 0; i < len(rg.Repeats); i++ {
-        repeat := &rg.Repeats[i]
+        repeat := rg.Repeats[i]
         repeat.ClassNode = tree.ClassNodes[repeat.Name]
 
         if repeat.ClassNode == nil {
