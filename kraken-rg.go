@@ -324,14 +324,17 @@ func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
 
 func (rg *RepeatGenome) genKrakenLib() {
 
+    fmt.Println()
     fmt.Println("beginning first pass")
     numRawKmers, numRawMins, rawMinCounts := rg.krakenFirstPass()
+    fmt.Println("first pass complete")
 
     fmt.Println("expecting", comma(int(numRawMins)), "unique minimizers")
     fmt.Println("expecting", comma(int(numRawKmers)), "non-unique kmers")
-    fmt.Println()
 
     // populate a list of sorted minimizers
+    fmt.Println()
+    fmt.Println("generating RepeatGenome.SortedMins")
     rg.SortedMins = make(MinInts, 0, numRawMins)
     for minInt, cnt := range rawMinCounts {
         if cnt > 0 {
@@ -344,8 +347,8 @@ func (rg *RepeatGenome) genKrakenLib() {
     sort.Sort(rg.SortedMins)
     fmt.Println("RepeatGenome.SortedMins sorted")
     fmt.Println("len(rg.SortedMins):", comma(len(rg.SortedMins)))
-    fmt.Println()
 
+    fmt.Println()
     fmt.Println("generating rawKmers and locMap")
     rawKmers := rg.getRawKmers(numRawKmers, rawMinCounts)
     runtime.GC() // manual memory clear
