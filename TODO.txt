@@ -33,8 +33,6 @@ Consider renaming Kmer to KmerPair or KrakenPair.
 
 Could populate RepeatGenome.ClassTree.ClassNodes in a separate loop.
 
-Consider making an LCA_ID type synonym.
-
 Non-exported globals or constants for bit offsets (e.g. that of a Kmer's LCA?)
 
 A ClassifyReadsFile() function that dispatches to different functions based on

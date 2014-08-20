@@ -34,8 +34,8 @@ func (repeatGenome *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) e
 
     classToCount := make(map[ClassID]uint64)
     for i := range repeatGenome.Kmers {
-        lcaID := *(*ClassID)(unsafe.Pointer(&repeatGenome.Kmers[i][8]))
-        classToCount[lcaID]++
+        classID := *(*ClassID)(unsafe.Pointer(&repeatGenome.Kmers[i][8]))
+        classToCount[classID]++
     }
 
     root := JSONNode{tree.Root.Name, classToCount[0], nil}
@@ -121,9 +121,9 @@ func (rg *RepeatGenome) WriteMins() error {
         }
         for _, kmer := range rg.getMinsKmers(thisMin) {
             kmerSeqInt := *(*KmerInt)(unsafe.Pointer(&kmer[0]))
-            lcaID := *(*ClassID)(unsafe.Pointer(&kmer[8]))
+            classID := *(*ClassID)(unsafe.Pointer(&kmer[8]))
             fillKmerBuf(kmerBuf, kmerSeqInt)
-            _, err = fmt.Fprintf(writer, "\t%s %s\n", kmerBuf, rg.ClassTree.NodesByID[lcaID].Name)
+            _, err = fmt.Fprintf(writer, "\t%s %s\n", kmerBuf, rg.ClassTree.NodesByID[classID].Name)
             if err != nil {
                 return err
             }

@@ -86,13 +86,13 @@ func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs []TextSeq, responseChan c
 
             kmerBytes := read[i : i+k_]
             kmerInt := kmerBytes.kmerInt().canonicalRepr()
-            kmerClass := rg.getKmerLCA(kmerInt)
+            kmerLCA := rg.getKmerLCA(kmerInt)
 
-            if kmerClass != nil {
+            if kmerLCA != nil {
                if class == nil {
-                   class = kmerClass
+                   class = kmerLCA
                } else {
-                   class = rg.ClassTree.getLCA(class, kmerClass)
+                   class = rg.ClassTree.getLCA(class, kmerLCA)
                 }
             }
         }

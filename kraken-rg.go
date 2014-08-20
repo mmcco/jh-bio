@@ -288,17 +288,17 @@ func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
     }()
 
     for i := 0; i < numCPU; i++ {
-        // this function finds the LCA of a set of kmers and updates the supplied LCA_ID pointer accordingly
+        // this function finds the LCA of a set of kmers and updates the supplied ClassID pointer accordingly
         go func() {
             for pair := range pairChan {
                 // grab the LCA of the first kmer in this set, and use it as our starting point
-                lcaID := *(*ClassID)(unsafe.Pointer(&pair.Set[0][8]))
-                currLCA := rg.ClassTree.NodesByID[lcaID]
+                classID := *(*ClassID)(unsafe.Pointer(&pair.Set[0][8]))
+                currLCA := rg.ClassTree.NodesByID[classID]
 
                 // loop through the rest, updating currLCA
                 for i := 1; i < len(pair.Set); i++ {
-                    lcaID = *(*ClassID)(unsafe.Pointer(&pair.Set[i][8]))
-                    currLCA = rg.ClassTree.getLCA(currLCA, rg.ClassTree.NodesByID[lcaID])
+                    classID = *(*ClassID)(unsafe.Pointer(&pair.Set[i][8]))
+                    currLCA = rg.ClassTree.getLCA(currLCA, rg.ClassTree.NodesByID[classID])
                 }
 
                 *pair.LcaPtr = currLCA.ID
@@ -316,8 +316,8 @@ func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
             end++
         }
         rg.Kmers = append(rg.Kmers, rawKmers[start])
-        lcaPtr := (*ClassID)(unsafe.Pointer(&rg.Kmers[len(rg.Kmers)-1][8]))
-        pairChan <- ReducePair{lcaPtr, rawKmers[start:end]}
+        classPtr := (*ClassID)(unsafe.Pointer(&rg.Kmers[len(rg.Kmers)-1][8]))
+        pairChan <- ReducePair{classPtr, rawKmers[start:end]}
     }
 
 }
