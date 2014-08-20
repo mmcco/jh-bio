@@ -36,8 +36,10 @@ func (ioError IOError) Error() string {
     return fmt.Sprintf("IO error in %s: %s", ioError.FuncName, ioError.SubError.Error())
 }
 
-// Courtesy of https://github.com/dustin/go-humanize
-// Returns a string representing the int, with commas for readability.
+/*
+   Courtesy of https://github.com/dustin/go-humanize
+   Returns a string representing the int, with commas for readability.
+*/
 func comma(v int) string {
     sign := ""
     if v < 0 {
@@ -63,7 +65,9 @@ func comma(v int) string {
     return sign + strings.Join(parts[j:], ",")
 }
 
-// returns the number of lines and a slice of the lines
+/*
+   Splits a byte slice on newlines, returning the resulting 2D slice.
+*/
 func lines(byteSlice []byte) [][]byte {
     var lines [][]byte = bytes.Split(byteSlice, []byte{'\n'})
     // drop trailing empty lines
@@ -73,6 +77,9 @@ func lines(byteSlice []byte) [][]byte {
     return lines
 }
 
+/*
+   Reads the file at the supplied path and returns an error or its lines' bytes.
+*/
 func fileLines(filepath string) (err error, linesBytes [][]byte) {
     rawBytes, err := ioutil.ReadFile(filepath)
     if err != nil {
@@ -151,17 +158,17 @@ func minKmerInt(a, b KmerInt) KmerInt {
 }
 
 // needed for sort.Interface
-func (kmers PKmers) Len() int {
-    return len(kmers)
+func (pkmers PKmers) Len() int {
+    return len(pkmers)
 }
 
-func (kmers PKmers) Swap(i, j int) {
-    kmers[i], kmers[j] = kmers[j], kmers[i]
+func (pkmers PKmers) Swap(i, j int) {
+    pkmers[i], pkmers[j] = pkmers[j], pkmers[i]
 }
 
-func (kmers PKmers) Less(i, j int) bool {
-    iVal := *(*uint64)(unsafe.Pointer(&kmers[i][0]))
-    jVal := *(*uint64)(unsafe.Pointer(&kmers[j][0]))
+func (pkmers PKmers) Less(i, j int) bool {
+    iVal := *(*uint64)(unsafe.Pointer(&pkmers[i][0]))
+    jVal := *(*uint64)(unsafe.Pointer(&pkmers[j][0]))
     return iVal < jVal
 }
 
