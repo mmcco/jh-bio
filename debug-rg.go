@@ -165,6 +165,12 @@ func (rg *RepeatGenome) checkIntegrity() {
     }
 }
 
+/*
+   Checks whether every index in rawKmers was set when it was populated.
+   rawKmers is initialized as a list of zero-kmers.
+   If there was a mismatch in the supplied minimizer counts and the actual minimizer counts, at least one kmer will almost certainly be left unassigned.
+   Because no reference repeats map to root (whose ClassID is 0), no rawKmer index should be a zero kmer.
+*/
 func (rawKmers Kmers) checkIntegrity() {
     var zeroKmer Kmer // works because no raw kmer should have an LCA of zero, which represents root
     for i, kmer := range rawKmers {

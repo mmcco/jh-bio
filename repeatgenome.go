@@ -458,11 +458,11 @@ func New(config Config) (error, *RepeatGenome) {
             return err, nil
         }
     } else {
-        minsFile, err := os.OpenFile(rg.Name+".mins", os.O_RDONLY, 0400)
+        krakenFile, err := os.OpenFile(rg.Name+"-lib/"+rg.Name+".kraken", os.O_RDONLY, 0400)
 
         if err == nil {    // implies the file already exists
             fmt.Println("\nKraken library file exists - using contents")
-            err = rg.ReadKraken(minsFile)
+            err = rg.ReadKraken(krakenFile)
             if err != nil {
                 return IOError{"Kmers.ReadKraken()", err}, nil
             }
