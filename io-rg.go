@@ -1,3 +1,6 @@
+/*
+   A set of functions and datatypes used for reading input data, Kraken library writing, and JSON data writing.
+*/
 package repeatgenome
 
 import (
@@ -22,6 +25,12 @@ type JSONNode struct {
     Children []*JSONNode `json:"children"`
 }
 
+/*
+   Writes a JSON representation of the class tree.
+   Used by the Javascript visualization, among other things.
+   Currently, each node is associated with a value "size", the number of kmers associated with it.
+   useCumSize determines whether the kmer count is cumulative, counting all kmers in its subtree.
+*/
 func (repeatGenome *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) error {
     tree := &repeatGenome.ClassTree
 
@@ -58,6 +67,9 @@ func (repeatGenome *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) e
     return nil
 }
 
+/*
+   Recursively populates a JSONNode tree with its kmer counts.
+*/
 func (classTree *ClassTree) jsonRecPopulate(jsonNode *JSONNode, classToCount map[ClassID]uint64) {
     classNode := classTree.ClassNodes[jsonNode.Name]
     for i := range classNode.Children {
@@ -69,6 +81,9 @@ func (classTree *ClassTree) jsonRecPopulate(jsonNode *JSONNode, classToCount map
     }
 }
 
+/*
+   Populates each node in the JSONNode tree with its cumulative kmer count.
+*/
 func (jsonNode *JSONNode) jsonRecSize() uint64 {
     for i := range jsonNode.Children {
         jsonNode.Size += jsonNode.Children[i].jsonRecSize()
@@ -76,6 +91,10 @@ func (jsonNode *JSONNode) jsonRecSize() uint64 {
     return jsonNode.Size
 }
 
+/*
+   Deletes the leaves from a JSONNode tree.
+   Used to ignore leaves for visualizations.
+*/
 func (jsonNode *JSONNode) deleteLeaves() {
     branchChildren := []*JSONNode{}
     for i := range jsonNode.Children {

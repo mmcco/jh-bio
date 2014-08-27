@@ -1,6 +1,9 @@
 repeatgenome
 ============
 
+Intro
+------------
+
 While still under heavy development, this package is in what will likely be its long-term and stable form.
 
 It implements a slightly modified version of Kraken, a metagenomics algorithm. For some constant *k*, Kraken associates each *k*-long subsequence (*"k-mer"*) of a set of reference genomes with its least-common ancestor (LCA) in the taxonomy tree of the reference genomes used. For example, a certain k-mer may exist only in a given genus. The resulting library is then used to estimate which subtree of the taxonomy tree each of a set of sequencing reads came from. This is done by querying the reads' k-mers against the library. For a full description, see the [journal article](http://genomebiology.com/2014/15/3/R46).
