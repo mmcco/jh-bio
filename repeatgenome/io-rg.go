@@ -31,15 +31,15 @@ type JSONNode struct {
    Currently, each node is associated with a value "size", the number of kmers associated with it.
    useCumSize determines whether the kmer count is cumulative, counting all kmers in its subtree.
 */
-func (repeatGenome *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) error {
-    tree := &repeatGenome.ClassTree
+func (rg *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) error {
+    tree := &rg.ClassTree
 
     statDirName := rg.Name + "-stats"
     err := os.Mkdir(statDirName, 0777)
     if err != nil {
         return IOError{"RepeatGenome.WriteClassJSON()", err}
     }
-    filename := statDirName + "/" + repeatGenome.Name + ".classtree.json"
+    filename := statDirName + "/" + rg.Name + ".classtree.json"
     outfile, err := os.Create(filename)
     defer outfile.Close()
     if err != nil {
@@ -47,8 +47,8 @@ func (repeatGenome *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) e
     }
 
     classToCount := make(map[ClassID]uint64)
-    for i := range repeatGenome.Kmers {
-        classID := *(*ClassID)(unsafe.Pointer(&repeatGenome.Kmers[i][8]))
+    for i := range rg.Kmers {
+        classID := *(*ClassID)(unsafe.Pointer(&rg.Kmers[i][8]))
         classToCount[classID]++
     }
 
