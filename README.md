@@ -36,4 +36,6 @@ Output
 
 `<genome-name>-lib`: Reusable library data associated with this genome.
 * `<genome-name>.kraken`: The Kraken library for this genome. The storage format is relatively simple using varints - refer to the source code of RepeatGenome.WriteKraken() and RepeatGenome.ReadKraken() for a full specification.
+
 `<genome-name>-stats`: Contains any statistics data written in the course of processing.
+* `<genome-name>.classtree.json`: The classification tree JSON data optionally written.
