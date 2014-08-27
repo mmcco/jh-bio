@@ -1,7 +1,7 @@
 repeatgenome
 ============
 
-Intro
+Introduction
 ------------
 
 While still under heavy development, this package is in what will likely be its long-term and stable form.
@@ -15,3 +15,23 @@ We use [RepeatMasker](http://repeatmasker.org/) to determine what parts of a ref
 This is an admittedly brief description of the program logic. We may publish a more thorough coverage such as a white paper eventually. However, if you want to fully understand the code, it would be best to read the Kraken article, the apparently relevant parts of the [RepeatMasker documentation](http://repeatmasker.org/webrepeatmaskerhelp.html), and the source code's function comments. The RepeatGenome source code is heavily commented, and the result of the [godoc](http://blog.golang.org/godoc-documenting-go-code) documentation generater will soon be posted publicly.
 
 Integers are usually explicitly declared as having type int64 or uint64, but due to the size of the minimizer maps and of genomes in general, RepeatGenome probably won't run on 32-bit systems. You may be able to make it work for small *m* and *k* values and small reference genomes, but there are no guarantees.
+
+Input
+------------
+
+The requirements for file input are currently somewhat strict. If you find them limiting, let me know and I can quickly add more flexible options.
+
+The main argument to `repeatgenome` is the genome name. This should be the abbreviation of the reference genome being used - for example, most of our tests were run on the most recent *Drosophila melanogaster* (fruitfly) genome, dm3.
+
+In the below file and directory names, `<genome-name>` is used to denote the above-mentioned genome name.
+
+There is expected to be a subdirectory of the current working directory bearing the genome name. This directory should contain:
+* all reference sequence files, in fasta format, with the `.fasta` suffix.
+* a RepeatMasker output file with the `.fa.out` suffix.
+
+Additionally, if any reads are to be processed, a subdirectory `<genome-name>-reads` of the current working directory is expected to contain all reads in SAM format, with the `.sam` suffix.
+
+Output
+------------
+
+`<genome-name>-stats`: Contains any statistics data written in the course of processing.
