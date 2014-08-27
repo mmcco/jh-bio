@@ -1,8 +1,8 @@
-package repeatgenome
-
 /*
    A collection of trivial functions used in other source files of the repeatgenome package.
 */
+
+package repeatgenome
 
 import (
     "bytes"

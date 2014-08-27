@@ -1,10 +1,12 @@
-package repeatgenome
-
 /*
    Somewhat archaic functions that deal solely with TextSeq
    These operations are far slower than the equivalents performed on the corresponding int types.
    They therefore generally shouldn't be used.
+*/
 
+package repeatgenome
+
+/*
    A representation of a genetic sequence using one byte letter per base.
    A type synonym is used to differentiate one-byte-per-base sequences from two-bits-per-base sequences (type Seq), which also use the concrete type []byte.
 */

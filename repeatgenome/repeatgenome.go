@@ -1,3 +1,8 @@
+/*
+   The core functionality of the package, from which other functions are dispatched.
+   Includes RepeatMasker-related data structure definitions and parsers, as well as the RepeatGenome definition and initializer.
+*/
+
 package repeatgenome
 
 import (

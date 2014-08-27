@@ -1,8 +1,8 @@
-package repeatgenome
-
 /*
    Functions used in read classification.
 */
+
+package repeatgenome
 
 import (
     "bytes"

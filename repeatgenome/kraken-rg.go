@@ -1,3 +1,7 @@
+/*
+   Code involved with Kraken library generation.
+*/
+
 package repeatgenome
 
 import (

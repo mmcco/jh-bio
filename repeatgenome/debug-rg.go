@@ -1,3 +1,8 @@
+/*
+   General debugging functions.
+   Most effort is put into checking the integrity and correctness of data.
+*/
+
 package repeatgenome
 
 import (

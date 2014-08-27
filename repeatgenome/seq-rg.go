@@ -1,8 +1,8 @@
-package repeatgenome
-
 /*
    General sequence-manipulation functions.
 */
+
+package repeatgenome
 
 import (
     "fmt"

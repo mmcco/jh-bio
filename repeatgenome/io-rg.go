@@ -1,6 +1,7 @@
 /*
    A set of functions and datatypes used for reading input data, Kraken library writing, and JSON data writing.
 */
+
 package repeatgenome
 
 import (

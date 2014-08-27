@@ -1,6 +1,7 @@
 /*
    Functions used for (mostly simple) statistical analysis of the repeat sequence and Kraken data.
 */
+
 package repeatgenome
 
 import (
