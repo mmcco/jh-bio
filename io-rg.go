@@ -388,9 +388,14 @@ func (matches Matches) Write(filename string) error {
 
 func (rg *RepeatGenome) WriteKraken() error {
     buf := make([]byte, 10) // varints can occupy at most 10 bytes
-    outfile, err := os.Create(rg.Name + "-lib/" + rg.Name + ".kraken")
+    libDirName := rg.Name + "-lib"
+    err := os.Mkdir(libDirName)
     if err != nil {
-        return IOError{"FullKmers.WriteKraken()", err}
+        return IOError{"RepeatGenome.WriteKraken()", err}
+    }
+    outfile, err := os.Create(libDirName + "/" + rg.Name + ".kraken")
+    if err != nil {
+        return IOError{"RepeatGenome.WriteKraken()", err}
     }
     defer outfile.Close()
 
