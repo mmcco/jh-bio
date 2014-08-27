@@ -34,7 +34,12 @@ type JSONNode struct {
 func (repeatGenome *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) error {
     tree := &repeatGenome.ClassTree
 
-    filename := repeatGenome.Name + ".classtree.json"
+    statDirName := rg.Name + "-stats"
+    err := os.Mkdir(statDirName, 0777)
+    if err != nil {
+        return IOError{"RepeatGenome.WriteClassJSON()", err}
+    }
+    filename := statDirName + "/" + repeatGenome.Name + ".classtree.json"
     outfile, err := os.Create(filename)
     defer outfile.Close()
     if err != nil {
