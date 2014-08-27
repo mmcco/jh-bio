@@ -389,7 +389,7 @@ func (matches Matches) Write(filename string) error {
 func (rg *RepeatGenome) WriteKraken() error {
     buf := make([]byte, 10) // varints can occupy at most 10 bytes
     libDirName := rg.Name + "-lib"
-    err := os.Mkdir(libDirName)
+    err := os.Mkdir(libDirName, 0777)
     if err != nil {
         return IOError{"RepeatGenome.WriteKraken()", err}
     }
