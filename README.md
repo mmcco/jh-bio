@@ -21,7 +21,7 @@ Input
 
 The requirements for file input are currently somewhat strict. If you find them limiting, let me know and I can quickly add more flexible options.
 
-The main argument to `repeatgenome` is the genome name. This should be the abbreviation of the reference genome being used - for example, most of our tests were run on the most recent *Drosophila melanogaster* (fruitfly) genome, dm3.
+The main argument to `run-rg` is the genome name. This should be the abbreviation of the reference genome being used - for example, most of our tests were run on the most recent *Drosophila melanogaster* (fruitfly) genome, dm3.
 
 In the below file and directory names, `<genome-name>` is used to denote the above-mentioned genome name.
 
@@ -34,8 +34,12 @@ Additionally, if any reads are to be processed, a subdirectory `<genome-name>-re
 Output
 ------------
 
-`<genome-name>-lib`: Reusable library data associated with this genome.
+Below are the directories and contents output by `run-rg`.
+
+`<genome-name>-lib/`: Reusable library data associated with this genome.
 * `<genome-name>.kraken`: The Kraken library for this genome. The storage format is relatively simple using varints - refer to the source code of RepeatGenome.WriteKraken() and RepeatGenome.ReadKraken() for a full specification.
 
-`<genome-name>-stats`: Contains any statistics data written in the course of processing.
+`<genome-name>-stats/`: Contains any statistics data written in the course of processing.
 * `<genome-name>.classtree.json`: The classification tree JSON data optionally written.
+
+Because the sequence alignment API is not yet defined, read-classification data is not yet written to file. The current code is therefore primarily a research implementation. If there's a certain format in which you'd like it stored, let me know.
