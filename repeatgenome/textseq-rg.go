@@ -40,7 +40,7 @@ func (seq TextSeq) revComp() TextSeq {
     return revCompSeq
 }
 
-/* 
+/*
    Returns a bool describing whether the first TextSeq is lexicographically smaller than the second.
 */
 func Less(a, b TextSeq) bool {

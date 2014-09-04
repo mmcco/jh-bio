@@ -29,8 +29,8 @@ func (classTree *ClassTree) getLCA(cnA, cnB *ClassNode) *ClassNode {
 }
 
 /*
-    Finds the ClassNode associated with a Kmer in the Kraken library.
-    Part of the core Kraken read-classification functionality.
+   Finds the ClassNode associated with a Kmer in the Kraken library.
+   Part of the core Kraken read-classification functionality.
 */
 func (rg *RepeatGenome) getKmerLCA(kmerInt KmerInt) *ClassNode {
     minimizer := kmerInt.Minimize()

@@ -99,7 +99,7 @@ func (kmerInt KmerInt) Minimize() MinInt {
     currMin := ^KmerInt(0)
     var possMin KmerInt
 
-    var i uint8    // the positive-strand index of the minimizers tested on the iteration
+    var i uint8 // the positive-strand index of the minimizers tested on the iteration
     for i = 0; i <= k-m; i++ {
         possMin = mMask & kmerInt
         if possMin < currMin {
@@ -212,10 +212,10 @@ func (kmerInt KmerInt) MinKey() MinKey {
     rcKmerInt := kmerInt.revComp()
     numPossMins := k - m + 1
     // despite being minimizers (and therefore expected to be MinInts), we make possMin and currMin KmerInts for ease of manipulation and then convert upon returning
-    currMin := ^KmerInt(0)    // initialize the current best minimizer candidate as MAX_INT
+    currMin := ^KmerInt(0) // initialize the current best minimizer candidate as MAX_INT
     var currKey MinKey = 0
 
-    var i uint8    // the positive-strand start index of the minimizers tested in this iteration
+    var i uint8 // the positive-strand start index of the minimizers tested in this iteration
     for i = 0; i < numPossMins; i++ {
         possMin := minKmerInt(mMask&kmerInt, mMask&rcKmerInt)
 

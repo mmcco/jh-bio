@@ -89,10 +89,10 @@ func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs []TextSeq, responseChan c
             kmerLCA := rg.getKmerLCA(kmerInt)
 
             if kmerLCA != nil {
-               if class == nil {
-                   class = kmerLCA
-               } else {
-                   class = rg.ClassTree.getLCA(class, kmerLCA)
+                if class == nil {
+                    class = kmerLCA
+                } else {
+                    class = rg.ClassTree.getLCA(class, kmerLCA)
                 }
             }
         }
@@ -192,7 +192,7 @@ func (rg *RepeatGenome) GetProcReads() (error, []TextSeq) {
 }
 
 /*
-   
+
 */
 func (rg *RepeatGenome) GetSAMReads() (error, []TextSeq) {
     workingDirName, err := os.Getwd()
