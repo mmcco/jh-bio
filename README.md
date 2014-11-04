@@ -42,8 +42,8 @@ Additionally, if any reads are to be processed, a subdirectory `<genome-name>-re
 * `no_write_lib`: Do not write the database to file.
 * `verify_class`: Run classification a second time, with SAM-formatted reads, to find the percent of reads that were classified correctly. SAM-formatted reads must be available.
 * `debug`: Run and print various debugging tests checking sanity and data integrity.
-* `cpuprof`: Write cpu profile to file <genomeName>.cpuprof using the runtime/pprof library.
-* `memprof`: Write memory profile to <genomeName>.memprof using the runtime/pprof library.
+* `cpuprof`: Write cpu profile to file `<genomeName>.cpuprof` using the runtime/pprof library.
+* `memprof`: Write memory profile to `<genomeName>.memprof` using the runtime/pprof library.
 * `lca_classify`: Use the LCA of all recognized k-mers' classes as a read's classification. The default is to use the class of the first recognized k-mer.
 
 Output
