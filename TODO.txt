@@ -88,3 +88,6 @@ Kraken.)
 
 The sole command line argument is the name of the reference genome (e.g.
 "dm3").
+
+Ensure that the stored Kraken data is referred to as the database, not
+the library, to prevent confusion (see also no_write_lib).

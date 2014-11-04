@@ -78,7 +78,7 @@ func main() {
 
     k_arg := flag.Uint("k", 31, "kmer length")
     m_arg := flag.Uint("m", 15, "minimizer length")
-    forceGen := flag.Bool("force_gen", false, "force Kraken library generation, regardless of whether it already exists in stored form")
+    forceGen := flag.Bool("force_gen", false, "force Kraken database generation, regardless of whether it already exists in stored form")
     writeStats := flag.Bool("write_stats", false, "write various tab-delimited and JSON files representing peripheral Kraken and repeat data")
     dontWriteLib := flag.Bool("no_write_lib", false, "don't write the Kraken library to file")
     verifyClass := flag.Bool("verify_class", false, "run classification a second time, with SAM-formatted reads, to find percent correct classification")

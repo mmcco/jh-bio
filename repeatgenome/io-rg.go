@@ -16,7 +16,7 @@ import (
     "unsafe"
 )
 
-// A magic value, used to give an explicit, declarative error message if the user tries to parse a non-Kraken file as such.
+// A magic value, used to give an explicit, declarative error message if the user tries to parse a non-Kraken file.
 const magicVal int = 13377331
 
 // Used only for recursively writing the JSON representation of the ClassTree.

@@ -33,6 +33,19 @@ There is expected to be a subdirectory of the current working directory bearing 
 
 Additionally, if any reads are to be processed, a subdirectory `<genome-name>-reads` of the current working directory is expected to contain all reads in SAM format, with the `.sam` suffix.
 
+###Command Line Options
+
+* `-k`: The k-mer length. Defaults to the maximum, 31.
+* `-m`: The minimizer length. This must be shorter than the k-mer length. Defaults to the maximum, 15.
+* `force_gen`: Force generation of the Kraken database. By default, the database will be read from file if it already exists.
+* `write_stats`: Write various tab-delimited and JSON files representing peripheral Kraken and repeat data.
+* `no_write_lib`: Do not write the database to file.
+* `verify_class`: Run classification a second time, with SAM-formatted reads, to find the percent of reads that were classified correctly. SAM-formatted reads must be available.
+* `debug`: Run and print various debugging tests checking sanity and data integrity.
+* `cpuprof`: Write cpu profile to file <genomeName>.cpuprof using the runtime/pprof library.
+* `memprof`: Write memory profile to <genomeName>.memprof using the runtime/pprof library.
+* `lca_classify`: Use the LCA of all recognized k-mers' classes as a read's classification. The default is to use the class of the first recognized k-mer.
+
 Output
 ------------
 
