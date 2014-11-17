@@ -36,7 +36,7 @@ func (rg *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) error {
     tree := &rg.ClassTree
 
     statDirName := rg.Name + "-stats"
-    err := os.Mkdir(statDirName, os.ModeDir)
+    err := os.Mkdir(statDirName, os.ModePerm)
     if err != nil && !os.IsExist(err) {
         return IOError{"RepeatGenome.WriteClassJSON()", err}
     }
@@ -312,7 +312,7 @@ func fillMinBuf(slice TextSeq, seqInt MinInt) {
 
 func (rg *RepeatGenome) WriteStatData() error {
     statDirName := rg.Name + "-stats/"
-    err := os.Mkdir(statDirName, os.ModeDir)
+    err := os.Mkdir(statDirName, os.ModePerm)
     if err != nil && !os.IsExist(err) {
         return IOError{"RepeatGenome.WriteStatData()", err}
     }
@@ -395,7 +395,7 @@ func (matches Matches) Write(filename string) error {
 func (rg *RepeatGenome) WriteKraken() error {
     buf := make([]byte, 10) // varints can occupy at most 10 bytes
     libDirName := rg.Name + "-lib"
-    err := os.Mkdir(libDirName, os.ModeDir)
+    err := os.Mkdir(libDirName, os.ModePerm)
     if err != nil && !os.IsExist(err) {
         return IOError{"RepeatGenome.WriteKraken()", err}
     }

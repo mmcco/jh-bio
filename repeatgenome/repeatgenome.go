@@ -436,7 +436,7 @@ func New(config Config) (error, *RepeatGenome) {
     var err error
 
     if config.MemProfile {
-        os.Mkdir("profiles", os.ModeDir)
+        os.Mkdir("profiles", os.ModePerm)
         memProfFile, err = os.Create("profiles/" + rg.Name + ".memprof")
         if err != nil {
             return IOError{"RepeatGenome.getKrakenSlice()", err}, nil
