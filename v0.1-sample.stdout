@@ -1,0 +1,47 @@
+igm1:jh-bio $ time ./run-rg -force_gen dm3
+k = 31
+m = 15
+
+beginning first pass
+first pass complete
+expecting 941,480 unique minimizers
+expecting 41,469,788 non-unique kmers
+
+generating RepeatGenome.SortedMins
+RepeatGenome.SortedMins generated
+
+Beginning sorting RepeatGenome.SortedMins
+RepeatGenome.SortedMins sorted
+len(rg.SortedMins): 941,480
+
+generating rawKmers and locMap
+raw kmers slice generated - len = 41,469,788
+sorting rawKmers
+rawKmers sorted
+generating RepeatGenome.Kmers
+done generating RepeatGenome.Kmers
+10,502,035 unique kmers processed
+generating RepeatGenome.MinCounts
+RepeatGenome.MinCounts generated
+generating RepeatGenome.MinOffsets
+rg.MinOffsets generated - done!
+9,473 repeat types
+9,502 class nodes
+185,137 matches
+
+RepeatGenome.Kmers comprises 0.11 GB
+
+35.25 million reads processed per minute
+27.80% of the genome consists of repeat sequences
+48.44% of reads were classified with a repeat sequence (726,568 of 1,500,000)
+2.31% of classified reads were classified at the class tree root (34,677 reads)
+on average, a classification restricted a read's possible location to 1.15% of the genome
+on average, a non-root classification restricted a read's possible location to 1.11% of the genome
+on average, a classification restricted a read's possible location to 1.66% of the genome (non-strict)
+on average, a non-root classification restricted a read's possible location to 1.45% of the genome (non-strict)
+
+dm3 successfully generated - exiting
+
+real    4m18.660s
+user    17m5.441s
+sys     2m19.089s
