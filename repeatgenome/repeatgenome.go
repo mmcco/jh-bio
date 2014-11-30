@@ -9,6 +9,7 @@ import (
     "bytes"
     "fmt"
     "io/ioutil"
+    "github.com/plsql/jh-bio/bioutils"
     "log"
     "os"
     "runtime"
@@ -357,7 +358,7 @@ func parseMatches(genomeName string) (error, Matches) {
 }
 
 func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
-    chromFileInfos, err := ioutil.ReadDir(genomeName)
+    chromFileInfos, err := ioutil.ReadDir(genomeName + "-fasta")
     if err != nil {
         return fmt.Errorf("repeatgenome.parseGenome():" + err.Error()), nil
     }
@@ -365,46 +366,36 @@ func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
     chroms := make(map[string](map[string]TextSeq))
     // used below to store the two keys for RepeatGenome.chroms
     for i := range chromFileInfos {
-        // "my_genome_name", "my_chrom_name"  ->  "my_genome_name/my_chrom_name"
         chromFilename := chromFileInfos[i].Name()
-        chromFilepath := strings.Join([]string{genomeName, chromFilename}, "/")
+        chromName := chromFilename[:len(chromFilename)-3]
+        // "my_genome_name", "my_chrom_name"  ->  "my_genome_name/my_chrom_name"
+        chromFilepath := strings.Join([]string{genomeName + "-fasta", chromFilename}, "/")
         // process the ref genome files (*.fa), not the repeat ref files (*.fa.out and *.fa.align) or anything else
-        if strings.HasSuffix(chromFilepath, ".fa") {
-            err, seqLines := fileLines(chromFilepath)
-            if err != nil {
-                return err, nil
-            }
+        infile, err := os.Open(chromFilepath)
+        if err != nil {
+            return err, nil
+        }
+        err, seqMap := bioutils.ReadFASTA(infile)
+        if err != nil {
+            return err, nil
+        }
 
-            // maps each sequence name in this chrom to a slice of its sequence's lines
-            // the list is concatenated at the end for efficiency's sake
-            seqMap := make(map[string][][]byte)
-            numLines := uint64(len(seqLines))
-            var seqName string = "" // forward initialization necessary
-            var i uint64
-            for i = 0; i < numLines; i++ {
-                seqLine := bytes.TrimSpace(seqLines[i])
-                if seqLine[0] == byte('>') {
-                    seqName = string(bytes.TrimSpace(seqLine[1:]))
-                    if !warned && seqName != chromFilename[:len(chromFilename)-3] {
-                        fmt.Println("WARNING: reference genome is two-dimensional, containing sequences not named after their chromosome.")
-                        fmt.Println("Because RepeatMasker supplied only one-dimensional indexing, this may cause unexpected behavior or program failure.")
-                        fmt.Println("seqName:", seqName, "\tlen(seqName):", len(seqName))
-                        fmt.Println("chrom name:", chromFilename[:len(chromFilename)-3], "\tlen(chrom name):", len(chromFilename)-3)
-                        warned = true
-                    }
-                } else {
-                    if seqName == "" {
-                        return fmt.Errorf("repeatgenome.parseGenome(): Empty or missing sequence name in %s" + chromFilename), nil
-                    }
-                    seqMap[seqName] = append(seqMap[seqName], seqLine)
-                }
+        for seqName := range seqMap {
+            if warned {
+                break
             }
-            // finally, we insert this map into the full map
-            chromName := chromFilepath[len(genomeName)+1 : len(chromFilepath)-3]
-            chroms[chromName] = make(map[string]TextSeq)
-            for seqName, seqLines := range seqMap {
-                chroms[chromName][seqName] = TextSeq(bytes.ToLower(bytes.Join(seqLines, []byte{})))
+            if seqName != chromName {
+            fmt.Println("WARNING: reference genome is two-dimensional, containing sequences not named after their chromosome.")
+                fmt.Println("Because RepeatMasker supplied only one-dimensional indexing, this may cause unexpected behavior or program failure.")
+                fmt.Println("seqName:", seqName, "\tlen(seqName):", len(seqName))
+                fmt.Println("chrom name:", chromName, "\tlen(chrom name):", len(chromName))
+                warned = true
             }
+        }
+
+        chroms[chromName] = make(map[string]TextSeq)
+        for seqName, seqBytes := range seqMap {
+            chroms[chromName][seqName] = TextSeq(bytes.ToLower(seqBytes))
         }
     }
     return nil, chroms

@@ -27,9 +27,9 @@ The main argument to `run-rg` is the genome name. This should be the abbreviatio
 
 In the below file and directory names, `<genome-name>` is used to denote the above-mentioned genome name.
 
-There is expected to be a subdirectory of the current working directory bearing the genome name. This directory should contain:
-* all reference sequence files, in fasta format, with the `.fasta` suffix.
-* a RepeatMasker output file with the `.fa.out` suffix.
+There is expected to be a subdirectory of the current working directory bearing the genome name. This directory should contain a RepeatMasker output file with the `.fa.out` suffix.
+
+A second directory `<genome-name>-fasta` should contain all reference sequence files in FASTA format.
 
 Additionally, if any reads are to be processed, a subdirectory `<genome-name>-reads` of the current working directory is expected to contain all reads in SAM format, with the `.sam` suffix.
 
