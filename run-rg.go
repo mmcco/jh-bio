@@ -61,15 +61,6 @@ func comma(v uint64) string {
 
 func main() {
 
-    /*
-    defer func() {
-        if r := recover(); r != nil {
-            fmt.Println("panic:", r)
-            os.Exit(1)
-        }
-    }()
-    */
-
     if len(os.Args) < 2 {
         fmt.Println("arg error - usage: ./minimize <flags> <reference genome dir>")
         os.Exit(1)

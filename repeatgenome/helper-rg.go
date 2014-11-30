@@ -12,32 +12,9 @@ import (
     "strings"
 )
 
-type ParseError struct {
-    FuncName string
-    Filepath string
-    SubError error
-}
-
-type IOError struct {
-    FuncName string
-    SubError error
-}
-
-func (parseError ParseError) Error() string {
-    if len(parseError.Filepath) == 0 {
-        return fmt.Sprintf("%s: parsing error: %s", parseError.FuncName, parseError.SubError.Error())
-    } else {
-        return fmt.Sprintf("%s: parsing error in file %s: %s", parseError.FuncName, parseError.Filepath, parseError.SubError.Error())
-    }
-}
-
-func (ioError IOError) Error() string {
-    return fmt.Sprintf("IO error in %s: %s", ioError.FuncName, ioError.SubError.Error())
-}
-
 /*
    Courtesy of https://github.com/dustin/go-humanize
-   Returns a string representing the int, with commas for readability.
+   Returns a string representing the int with commas for readability.
 */
 func comma(v int) string {
     sign := ""

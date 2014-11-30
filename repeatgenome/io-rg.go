@@ -38,13 +38,13 @@ func (rg *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) error {
     statDirName := rg.Name + "-stats"
     err := os.Mkdir(statDirName, os.ModePerm)
     if err != nil && !os.IsExist(err) {
-        return IOError{"RepeatGenome.WriteClassJSON()", err}
+        return fmt.Errorf("RepeatGenome.WriteClassJSON():" + err.Error())
     }
     filename := statDirName + "/" + rg.Name + ".classtree.json"
     outfile, err := os.Create(filename)
     defer outfile.Close()
     if err != nil {
-        return IOError{"RepeatGenome.WriteClassJSON()", err}
+        return fmt.Errorf("RepeatGenome.WriteClassJSON():" + err.Error())
     }
 
     classToCount := make(map[ClassID]uint64)
@@ -66,7 +66,7 @@ func (rg *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) error {
 
     jsonBytes, err := json.MarshalIndent(root, "", "\t")
     if err != nil {
-        return IOError{"RepeatGenome.WriteClassJSON()", err}
+        return fmt.Errorf("RepeatGenome.WriteClassJSON():" + err.Error())
     }
     fmt.Fprint(outfile, string(jsonBytes))
 
@@ -226,7 +226,7 @@ func writeKmerInt(writer io.ByteWriter, seqInt KmerInt) error {
             err = fmt.Errorf("error in printSeqInt() base selection")
         }
         if err != nil {
-            return IOError{"repeatgenome.writeSeqInt()", err}
+            return fmt.Errorf("repeatgenome.writeSeqInt():" + err.Error())
         }
     }
     return nil
@@ -254,7 +254,7 @@ func writeMinInt(writer io.ByteWriter, seqInt MinInt) error {
             err = fmt.Errorf("error in printSeqInt() base selection")
         }
         if err != nil {
-            return IOError{"repeatgenome.writeSeqInt()", err}
+            return fmt.Errorf("repeatgenome.writeSeqInt():" + err.Error())
         }
     }
     return nil
@@ -314,22 +314,22 @@ func (rg *RepeatGenome) WriteStatData() error {
     statDirName := rg.Name + "-stats/"
     err := os.Mkdir(statDirName, os.ModePerm)
     if err != nil && !os.IsExist(err) {
-        return IOError{"RepeatGenome.WriteStatData()", err}
+        return fmt.Errorf("RepeatGenome.WriteStatData():" + err.Error())
     }
 
     err = rg.Repeats.Write(statDirName + "repeats.txt")
     if err != nil {
-        return IOError{"RepeatGenome.WriteStatData()", err}
+        return fmt.Errorf("RepeatGenome.WriteStatData():" + err.Error())
     }
 
     err = rg.Matches.Write(statDirName + "matches.txt")
     if err != nil {
-        return IOError{"RepeatGenome.WriteStatData()", err}
+        return fmt.Errorf("RepeatGenome.WriteStatData():" + err.Error())
     }
 
     err = ClassNodes(rg.ClassTree.NodesByID).Write(statDirName + "class-nodes.txt")
     if err != nil {
-        return IOError{"RepeatGenome.WriteStatData()", err}
+        return fmt.Errorf("RepeatGenome.WriteStatData():" + err.Error())
     }
 
     return nil
@@ -338,7 +338,7 @@ func (rg *RepeatGenome) WriteStatData() error {
 func (repeats Repeats) Write(filename string) error {
     outfile, err := os.Create(filename)
     if err != nil {
-        return IOError{"Repeats.Write()", err}
+        return fmt.Errorf("Repeats.Write():" + err.Error())
     }
     defer outfile.Close()
 
@@ -359,7 +359,7 @@ func (repeats Repeats) Write(filename string) error {
 func (classNodes ClassNodes) Write(filename string) error {
     outfile, err := os.Create(filename)
     if err != nil {
-        return IOError{"ClassNodes.Write()", err}
+        return fmt.Errorf("ClassNodes.Write():" + err.Error())
     }
     defer outfile.Close()
 
@@ -380,7 +380,7 @@ func (classNodes ClassNodes) Write(filename string) error {
 func (matches Matches) Write(filename string) error {
     outfile, err := os.Create(filename)
     if err != nil {
-        return IOError{"Matches.Write()", err}
+        return fmt.Errorf("Matches.Write():" + err.Error())
     }
     defer outfile.Close()
 
@@ -397,11 +397,11 @@ func (rg *RepeatGenome) WriteKraken() error {
     libDirName := rg.Name + "-lib"
     err := os.Mkdir(libDirName, os.ModePerm)
     if err != nil && !os.IsExist(err) {
-        return IOError{"RepeatGenome.WriteKraken()", err}
+        return fmt.Errorf("RepeatGenome.WriteKraken():" + err.Error())
     }
     outfile, err := os.Create(libDirName + "/" + rg.Name + ".kraken")
     if err != nil {
-        return IOError{"RepeatGenome.WriteKraken()", err}
+        return fmt.Errorf("RepeatGenome.WriteKraken():" + err.Error())
     }
     defer outfile.Close()
 
@@ -410,10 +410,10 @@ func (rg *RepeatGenome) WriteKraken() error {
         numBytes := binary.PutUvarint(buf, uint64(val.(int)))
         bytesWritten, err := outfile.Write(buf[:numBytes])
         if bytesWritten != numBytes {
-            return IOError{"RepeatGenome.WriteKraken()", fmt.Errorf("did not write expected number of bytes")}
+            return fmt.Errorf("RepeatGenome.WriteKraken(): did not write expected number of bytes")
         }
         if err != nil {
-            return IOError{"RepeatGenome.WriteKraken()", err}
+            return fmt.Errorf("RepeatGenome.WriteKraken():" + err.Error())
         }
     }
 
@@ -422,10 +422,10 @@ func (rg *RepeatGenome) WriteKraken() error {
         numBytes := binary.PutUvarint(buf, uint64(minInt))
         bytesWritten, err := outfile.Write(buf[:numBytes])
         if bytesWritten != numBytes {
-            return IOError{"RepeatGenome.WriteKraken()", fmt.Errorf("did not write expected number of bytes")}
+            return fmt.Errorf("RepeatGenome.WriteKraken(): did not write expected number of bytes")
         }
         if err != nil {
-            return IOError{"RepeatGenome.WriteKraken()", err}
+            return fmt.Errorf("RepeatGenome.WriteKraken():" + err.Error())
         }
     }
 
@@ -434,10 +434,10 @@ func (rg *RepeatGenome) WriteKraken() error {
         numBytes := binary.PutUvarint(buf, uint64(rg.MinCounts[minInt]))
         bytesWritten, err := outfile.Write(buf[:numBytes])
         if bytesWritten != numBytes {
-            return IOError{"RepeatGenome.WriteKraken()", fmt.Errorf("did not write expected number of bytes")}
+            return fmt.Errorf("RepeatGenome.WriteKraken(): did not write expected number of bytes")
         }
         if err != nil {
-            return IOError{"RepeatGenome.WriteKraken()", err}
+            return fmt.Errorf("RepeatGenome.WriteKraken():" + err.Error())
         }
     }
 
@@ -448,10 +448,10 @@ func (rg *RepeatGenome) WriteKraken() error {
         kmerBuf = kmer[:]
         numBytes, err := outfile.Write(kmerBuf)
         if numBytes != kmerSize {
-            return IOError{"RepeatGenome.WriteKraken()", fmt.Errorf("wrote too few kmer bytes")}
+            return fmt.Errorf("RepeatGenome.WriteKraken(): wrote too few kmer bytes")
         }
         if err != nil {
-            return IOError{"RepeatGenome.WriteKraken()", err}
+            return fmt.Errorf("RepeatGenome.WriteKraken():" + err.Error())
         }
     }
 
@@ -466,40 +466,40 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
     // check magic value
     thisMagicVal, err := binary.ReadUvarint(bufioReader)
     if err != nil {
-        return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), err}
+        return fmt.Errorf("RepeatGenome.ReadKraken():" + err.Error())
     }
     if int(thisMagicVal) != magicVal {
-        return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), fmt.Errorf("incorrect magic value - are you sure this is the right file?")}
+        return fmt.Errorf("RepeatGenome.ReadKraken(): incorrect magic value - are you sure" + infile.Name() + "is the right file?")
     }
 
     // check K
     thisK, err := binary.ReadUvarint(bufioReader)
     if err != nil {
-        return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), err}
+        return fmt.Errorf("RepeatGenome.ReadKraken():" + err.Error())
     }
     if uint8(thisK) != k {
-        return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), fmt.Errorf("incompatible k value - are you sure this is the right file?")}
+        return fmt.Errorf("RepeatGenome.ReadKraken(): incompatible k value - are you sure" + infile.Name() + "is the right file?")
     }
 
     // check M
     thisM, err := binary.ReadUvarint(bufioReader)
     if err != nil {
-        return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), err}
+        return fmt.Errorf("RepeatGenome.ReadKraken():" + err.Error())
     }
     if uint8(thisM) != m {
-        return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), fmt.Errorf("incompatible m value - are you sure this is the right file?")}
+        return fmt.Errorf("RepeatGenome.ReadKraken(): incompatible m value - are you sure" + infile.Name() + "is the right file?")
     }
 
     // get number of minimizers
     numMins, err := binary.ReadUvarint(bufioReader)
     if err != nil {
-        return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), err}
+        return fmt.Errorf("RepeatGenome.ReadKraken():" + err.Error())
     }
 
     // get number of kmers
     numKmers, err := binary.ReadUvarint(bufioReader)
     if err != nil {
-        return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), err}
+        return fmt.Errorf("RepeatGenome.ReadKraken():" + err.Error())
     }
 
     // populate rg.SortedMins
@@ -512,7 +512,7 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
     for i = 0; i < numMins; i++ {
         minInt, err := binary.ReadUvarint(bufioReader)
         if err != nil {
-            return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), err}
+            return fmt.Errorf("RepeatGenome.ReadKraken():" + err.Error())
         }
         rg.SortedMins = append(rg.SortedMins, MinInt(minInt))
     }
@@ -526,7 +526,7 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
     for _, minInt := range rg.SortedMins {
         minCount, err := binary.ReadUvarint(bufioReader)
         if err != nil {
-            return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), err}
+            return fmt.Errorf("RepeatGenome.ReadKraken():" + err.Error())
         }
         rg.MinCounts[minInt] = uint32(minCount)
     }
@@ -541,10 +541,11 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
     for i = 0; i < numKmers; i++ {
         numBytes, err := io.ReadFull(bufioReader, kmerBuf)
         if err != nil {
-            return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), err}
+            return fmt.Errorf("RepeatGenome.ReadKraken():" + err.Error())
         }
         if numBytes != len(kmerBuf) {
-            return ParseError{"RepeatGenome.ReadKraken()", infile.Name(), fmt.Errorf("only %d kmer bytes read instead of expected %d - on kmer index %d - file incorrectly written or corrupted", numBytes, len(kmerBuf), i)}
+            return fmt.Errorf("RepeatGenome.ReadKraken(): only %d kmer bytes read instead of expected %d - on kmer index %d - file %s incorrectly written or corrupted",
+                    numBytes, len(kmerBuf), i, infile.Name())
         }
 
         rg.Kmers = append(rg.Kmers, *(*Kmer)(unsafe.Pointer(&kmerBuf[0])))
@@ -618,7 +619,7 @@ func parseReadSAMs(filepath string) (error, []ReadSAM) {
     }
 
     if len(lines) < 3 {
-        err := ParseError{"parseReadSAMs()", filepath, fmt.Errorf("only %d lines in SAM file - need at least three", len(lines))}
+        err := fmt.Errorf("repeatgenome.parseReadSAMs(): only %d lines in SAM file %s - need at least three", len(lines), filepath)
         return err, nil
     }
 
@@ -629,7 +630,7 @@ func parseReadSAMs(filepath string) (error, []ReadSAM) {
     for i, line := range lines {
         fields := bytes.Fields(line)
         if len(fields) != 12 {
-            err := ParseError{"parseReadSAMs()", filepath, fmt.Errorf("SAM line has %d fields - 12 expected", len(fields))}
+            err := fmt.Errorf("parseReadSAMs(): SAM line in %s has %d fields - 12 expected", filepath, len(fields))
             return err, nil
         }
 

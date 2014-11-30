@@ -253,7 +253,7 @@ func parseMatches(genomeName string) (error, Matches) {
 
     err, matchLines := fileLines(filepath)
     if err != nil {
-        return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
+        return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
     }
 
     matchLines = matchLines[3:] // drop the header lines
@@ -263,9 +263,8 @@ func parseMatches(genomeName string) (error, Matches) {
     for _, matchLine := range matchLines {
         rawVals := strings.Fields(string(matchLine))
         if len(rawVals) != 15 {
-            return ParseError{"repeatgenome.parseMatches()",
-                    filepath,
-                    fmt.Errorf("supplied match line is not 15 fields long (has %d fields and length %d):\n", len(rawVals), len(matchLine))},
+            return fmt.Errorf("repeatgenome.parseMatches(): supplied match line in %s is not 15 fields long (has %d fields and length %d)",
+                    filepath, len(rawVals), len(matchLine)),
                 nil
         }
         var match Match
@@ -284,51 +283,51 @@ func parseMatches(genomeName string) (error, Matches) {
         // everything in this block is just vanilla trimming, converting, and error checking
         sw_Score, err := strconv.ParseInt(rawVals[0], 10, 32)
         if err != nil {
-            return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
+            return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
         }
         match.SW_Score = int32(sw_Score)
         match.PercDiv, err = strconv.ParseFloat(rawVals[1], 64)
         if err != nil {
-            return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
+            return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
         }
         match.PercDel, err = strconv.ParseFloat(rawVals[2], 64)
         if err != nil {
-            return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
+            return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
         }
         match.PercIns, err = strconv.ParseFloat(rawVals[3], 64)
         if err != nil {
-            return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
+            return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
         }
         match.SeqName = strings.TrimSpace(rawVals[4])
         match.SeqStart, err = strconv.ParseUint(rawVals[5], 10, 64)
         if err != nil {
-            return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
+            return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
         }
         match.SeqEnd, err = strconv.ParseUint(rawVals[6], 10, 64)
         if err != nil {
-            return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
+            return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
         }
         match.SeqRemains, err = strconv.ParseUint(rawVals[7], 10, 64)
         if err != nil {
-            return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
+            return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
         }
         // match.IsComplement, rawVals[8], moved above
         match.RepeatClass = append(strings.Split(strings.TrimSpace(rawVals[10]), "/"), strings.TrimSpace(rawVals[9]))
         match.RepeatStart, err = strconv.ParseInt(rawVals[11], 10, 64)
         if err != nil {
-            return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
+            return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
         }
         match.RepeatEnd, err = strconv.ParseInt(rawVals[12], 10, 64)
         if err != nil {
-            return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
+            return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
         }
         match.RepeatRemains, err = strconv.ParseInt(rawVals[13], 10, 64)
         if err != nil {
-            return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
+            return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
         }
         match.InsertionID, err = strconv.ParseUint(rawVals[14], 10, 64)
         if err != nil {
-            return ParseError{"repeatgenome.parseMatches()", filepath, err}, nil
+            return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
         }
 
         // necessary swaps to convert reverse complement repeat indexes to positive-strand indexes
@@ -360,7 +359,7 @@ func parseMatches(genomeName string) (error, Matches) {
 func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
     chromFileInfos, err := ioutil.ReadDir(genomeName)
     if err != nil {
-        return IOError{"repeatgenome.parseGenome()", err}, nil
+        return fmt.Errorf("repeatgenome.parseGenome():" + err.Error()), nil
     }
     warned := false
     chroms := make(map[string](map[string]TextSeq))
@@ -373,7 +372,6 @@ func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
         if strings.HasSuffix(chromFilepath, ".fa") {
             err, seqLines := fileLines(chromFilepath)
             if err != nil {
-                // error should already be IOError
                 return err, nil
             }
 
@@ -396,7 +394,7 @@ func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
                     }
                 } else {
                     if seqName == "" {
-                        return ParseError{"repeatgenome.parseGenome", chromFilepath, fmt.Errorf("Empty or missing sequence name")}, nil
+                        return fmt.Errorf("repeatgenome.parseGenome(): Empty or missing sequence name in %s" + chromFilename), nil
                     }
                     seqMap[seqName] = append(seqMap[seqName], seqLine)
                 }
@@ -439,7 +437,7 @@ func New(config Config) (error, *RepeatGenome) {
         os.Mkdir("profiles", os.ModePerm)
         memProfFile, err = os.Create("profiles/" + rg.Name + ".memprof")
         if err != nil {
-            return IOError{"RepeatGenome.getKrakenSlice()", err}, nil
+            return fmt.Errorf("repeatgenome.New():" + err.Error()), nil
         }
         pprof.WriteHeapProfile(memProfFile)
         defer memProfFile.Close()
@@ -469,7 +467,7 @@ func New(config Config) (error, *RepeatGenome) {
             fmt.Println("\nKraken library file exists - using contents")
             err = rg.ReadKraken(krakenFile)
             if err != nil {
-                return IOError{"Kmers.ReadKraken()", err}, nil
+                return fmt.Errorf("repeatgenome.New():" + err.Error()), nil
             }
         } else if os.IsNotExist(err) { // the case that there isn't a written file yet
             fmt.Println("Kraken library file doesn't exist - generating library\n")
