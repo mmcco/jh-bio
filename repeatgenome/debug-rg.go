@@ -23,9 +23,8 @@ func (rg *RepeatGenome) printSample(numMins, numKmers int) {
         }
         for _, kmer := range theseKmers {
             fmt.Print("\t")
-            (*(*KmerInt)(unsafe.Pointer(&kmer))).print()
-            classID := *(*ClassID)(unsafe.Pointer(&kmer[8]))
-            fmt.Printf("\t%s\n", rg.ClassTree.NodesByID[classID].Name)
+            kmer.Int().print()
+            fmt.Printf("\t%s\n", rg.ClassTree.NodesByID[kmer.ClassID()].Name)
         }
     }
 }
@@ -159,11 +158,10 @@ func (rg *RepeatGenome) checkIntegrity() {
     fmt.Println("all minimizers in rg.SortedMins present in rg.MinCounts and rg.MinOffsets")
 
     for _, kmer := range rg.Kmers {
-        kmerInt := *(*KmerInt)(unsafe.Pointer(&kmer))
-        lca := rg.getKmerLCA(kmerInt)
+        lca := rg.getKmerLCA(kmer.Int())
         if lca == nil {
             fmt.Print("ERROR: kmer ")
-            kmerInt.print()
+            kmer.Int().print()
             fmt.Println("not found by rg.getKmer()")
             os.Exit(1)
         }

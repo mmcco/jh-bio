@@ -10,7 +10,6 @@ import (
     "io/ioutil"
     "strconv"
     "strings"
-    "unsafe"
 )
 
 type ParseError struct {
@@ -167,9 +166,7 @@ func (pkmers PKmers) Swap(i, j int) {
 }
 
 func (pkmers PKmers) Less(i, j int) bool {
-    iVal := *(*uint64)(unsafe.Pointer(&pkmers[i][0]))
-    jVal := *(*uint64)(unsafe.Pointer(&pkmers[j][0]))
-    return iVal < jVal
+    return pkmers[i].Int() < pkmers[j].Int()
 }
 
 func (kmers Kmers) Len() int {
@@ -181,7 +178,7 @@ func (kmers Kmers) Swap(i, j int) {
 }
 
 func (kmers Kmers) Less(i, j int) bool {
-    return *(*KmerInt)(unsafe.Pointer(&kmers[i])) < *(*KmerInt)(unsafe.Pointer(&kmers[j]))
+    return kmers[i].Int() < kmers[j].Int()
 }
 
 // sorts by both min and kmer - too slow

@@ -43,9 +43,9 @@ func (rg *RepeatGenome) getKmerLCA(kmerInt KmerInt) *ClassNode {
     j := i + int64(rg.MinCounts[minimizer])
     for i < j {
         x := (j + i) / 2
-        thisKmerInt := *(*KmerInt)(unsafe.Pointer(&rg.Kmers[x]))
+        thisKmerInt := rg.Kmers[x].Int()
         if thisKmerInt == kmerInt {
-            return rg.ClassTree.NodesByID[*(*ClassID)(unsafe.Pointer(&rg.Kmers[x][8]))] // get kmer's LCA ID and return the corresponding ClassNode
+            return rg.ClassTree.NodesByID[rg.Kmers[x].ClassID()] // get kmer's LCA ID and return the corresponding ClassNode
         } else if thisKmerInt < kmerInt {
             i = x + 1
         } else {
@@ -128,8 +128,8 @@ func (rg *RepeatGenome) getMatchKmers(matchChan chan *Match, respChan chan Respo
 
             kmerInt := TextSeq(matchSeq[i : i+k_]).kmerInt().canonicalRepr()
             var kmer Kmer
-            *(*KmerInt)(unsafe.Pointer(&kmer)) = kmerInt
-            *(*ClassID)(unsafe.Pointer(&kmer[8])) = match.ClassNode.ID
+            (&kmer).SetInt(kmerInt)
+            (&kmer).SetClassID(match.ClassNode.ID)
             respChan <- ResponsePair{kmer, kmerInt.Minimize()}
         }
     }
@@ -272,8 +272,8 @@ func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
     if len(rawKmers) > 0 {
         numUniqs++ // account for the first one, which is skipped
         for i := 1; i < len(rawKmers); i++ {
-            lastKmerInt := *(*KmerInt)(unsafe.Pointer(&rawKmers[i-1]))
-            kmerInt := *(*KmerInt)(unsafe.Pointer(&rawKmers[i]))
+            lastKmerInt := rawKmers[i-1].Int()
+            kmerInt := rawKmers[i].Int()
             if kmerInt != lastKmerInt {
                 numUniqs++
             }
@@ -296,12 +296,12 @@ func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
         go func() {
             for pair := range pairChan {
                 // grab the LCA of the first kmer in this set, and use it as our starting point
-                classID := *(*ClassID)(unsafe.Pointer(&pair.Set[0][8]))
+                classID := pair.Set[0].ClassID()
                 currLCA := rg.ClassTree.NodesByID[classID]
 
                 // loop through the rest, updating currLCA
                 for i := 1; i < len(pair.Set); i++ {
-                    classID = *(*ClassID)(unsafe.Pointer(&pair.Set[i][8]))
+                    classID = pair.Set[i].ClassID()
                     currLCA = rg.ClassTree.getLCA(currLCA, rg.ClassTree.NodesByID[classID])
                 }
 
@@ -316,7 +316,7 @@ func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
     for end < numKmers {
         start = end
         end++
-        for end < numKmers && *(*uint64)(unsafe.Pointer(&rawKmers[end-1])) == *(*uint64)(unsafe.Pointer(&rawKmers[end])) {
+        for end < numKmers && rawKmers[end-1].Int() == rawKmers[end].Int() {
             end++
         }
         rg.Kmers = append(rg.Kmers, rawKmers[start])
@@ -332,6 +332,8 @@ func (rg *RepeatGenome) genKrakenLib() {
     fmt.Println("beginning first pass")
     numRawKmers, numRawMins, rawMinCounts := rg.krakenFirstPass()
     fmt.Println("first pass complete")
+
+    //fmt.Println("len(rawMinCounts):", comma(uint64(len(rawMinCounts))))
 
     fmt.Println("expecting", comma(int(numRawMins)), "unique minimizers")
     fmt.Println("expecting", comma(int(numRawKmers)), "non-unique kmers")
@@ -356,13 +358,12 @@ func (rg *RepeatGenome) genKrakenLib() {
     fmt.Println("generating rawKmers and locMap")
     rawKmers := rg.getRawKmers(numRawKmers, rawMinCounts)
     runtime.GC() // manual memory clear
-    fmt.Println("raw kmers slice generated - len =", comma(len(rawKmers)))
+    fmt.Println("raw kmers slice generated")
+    fmt.Println("len(rawKmers) =", comma(len(rawKmers)))
 
     if debug {
         rawKmers.checkIntegrity()
     }
-
-    //fmt.Println("len(rawMinCounts):", comma(uint64(len(rawMinCounts))))
 
     fmt.Println("sorting rawKmers")
     rg.sortRawKmers(rawKmers, rawMinCounts)
@@ -380,8 +381,7 @@ func (rg *RepeatGenome) genKrakenLib() {
     fmt.Println("generating RepeatGenome.MinCounts")
     rg.MinCounts = make([]uint32, minSliceSize, minSliceSize)
     for _, kmer := range rg.Kmers {
-        kmerInt := *(*KmerInt)(unsafe.Pointer(&kmer))
-        rg.MinCounts[kmerInt.Minimize()]++
+        rg.MinCounts[kmer.Int().Minimize()]++
     }
     fmt.Println("RepeatGenome.MinCounts generated")
 

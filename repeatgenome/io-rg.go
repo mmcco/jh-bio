@@ -49,7 +49,7 @@ func (rg *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) error {
 
     classToCount := make(map[ClassID]uint64)
     for i := range rg.Kmers {
-        classID := *(*ClassID)(unsafe.Pointer(&rg.Kmers[i][8]))
+        classID := rg.Kmers[i].ClassID()
         classToCount[classID]++
     }
 

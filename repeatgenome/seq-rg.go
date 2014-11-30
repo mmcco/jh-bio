@@ -277,3 +277,11 @@ func (kmer Kmer) Int() KmerInt {
 func (kmer Kmer) ClassID() ClassID {
     return *(*ClassID)(unsafe.Pointer(&kmer[8]))
 }
+
+func (kmer *Kmer) SetInt(kmerInt KmerInt) {
+    *(*KmerInt)(unsafe.Pointer(kmer)) = kmerInt
+}
+
+func (kmer *Kmer) SetClassID(classID ClassID) {
+    *(*ClassID)(unsafe.Pointer(&kmer[8])) = classID
+}
