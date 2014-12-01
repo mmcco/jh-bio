@@ -18,26 +18,31 @@ import (
     "strings"
 )
 
-// These variables are used ubiquitously, especially in performance-critical functions, so we grudgingly make them globals.
+// These variables are used ubiquitously, especially in
+// performance-critical functions, so we grudgingly make them globals.
 // K is the kmer size (in basepairs).
 // M is the minimizer size, which must be <= k.
 var k, m uint8
 
-// kMask and mMask contain k and m consecutive right aligned 1 bits respectively (e.g. "0000011111111").
+// kMask and mMask contain k and m consecutive right aligned 1 bits
+// respectively (e.g. "0000011111111").
 var kMask, mMask KmerInt
 
-// minSliceSize is the size of a slice that contains indexes for all possible mMers.
+// minSliceSize is the size of a slice that contains indexes for all
+// possible mMers.
 // It is calculated as: 1 << m
 var minSliceSize uint64
 var debug bool
 
-// This is used as a rudimentary way of determining how many goroutines to spawn in concurrent sections.
+// This is used as a rudimentary way of determining how many
+// goroutines to spawn in concurrent sections.
 var numCPU = runtime.NumCPU()
 
 // Used to write heap memory profile.
 var memProfFile *os.File
 
-// A value of type Config is passed to the New() function, which constructs and returns a new RepeatGenome.
+// A value of type Config is passed to the New() function, which
+// constructs and returns a new RepeatGenome.
 type Config struct {
     Name       string
     K          uint8
@@ -143,7 +148,10 @@ type RepeatGenome struct {
 
 /*
    Repeat.ID - A unique ID that we assign (not included in RepeatMasker output).
-               Because these are assigned in the order in which they are encountered in <genome name>.fa.out, they are not compatible across even different versions of the same reference genome. This may change.
+               Because these are assigned in the order in which they
+               are encountered in <genome name>.fa.out, they are not
+               compatible across even different versions of the same
+               reference genome. This may change.
    Repeat.Name - The repeat's fully qualified name, excluding root.
    Repeat.ClassList - A slice of this Repeat's class ancestry from the top of the tree down, excluding root.
    Repeat.ClassNode - A pointer to the ClassNode which corresponds to this repeat.
@@ -234,7 +242,8 @@ type PKmers []*Kmer
 /*
    Each base is represented by two bits.
    High-order bits are occupied first.
-   Remember that Seq.Len is the number of bases contained, while len(Seq.Bytes) is the number of bytes necessary to represent them.
+   Remember that Seq.Len is the number of bases contained, while
+   len(Seq.Bytes) is the number of bytes necessary to represent them.
 */
 type Seq struct {
     Bytes []byte
@@ -243,11 +252,15 @@ type Seq struct {
 
 type Seqs []Seq
 
-// A 2-dimensional map used to represent a newly-parsed FASTA-formatted reference genome.
+// A 2-dimensional map used to represent a newly-parsed
+// FASTA-formatted reference genome.
 type Chroms map[string](map[string]TextSeq)
 
-// parseMatches() is kept as a solo function rather than a method of type RepeatGenome.
-// This allows the function to be as portable as possible, which is important because some may come here wanting RepeatMasker-output-parsing code and nothing else.
+// parseMatches() is kept as a solo function rather than a method of
+// type RepeatGenome.
+// This allows the function to be as portable as possible, which is
+// important because some may come here wanting
+// RepeatMasker-output-parsing code and nothing else.
 func parseMatches(genomeName string) (error, Matches) {
     // "my_genome_name"  ->  "my_genome_name/my_genome_name.fa.out"
     filepath := strings.Join([]string{genomeName, "/", genomeName, ".fa.out"}, "")
@@ -272,8 +285,10 @@ func parseMatches(genomeName string) (error, Matches) {
         match.IsRevComp = rawVals[8] == "C"
 
         // remove enclosing parentheses
-        // !!! in the future, checkes to ensure that the parentheses exist should be added
-        // !!! it would also be sensible to check that rawVals[8] is either "C" or "+"
+        // TODO: in the future, check to ensure that the parentheses
+        // exist should be added
+        // TODO: it would also be sensible to check that rawVals[8] is
+        // either "C" or "+"
         rawVals[7] = rawVals[7][1 : len(rawVals[7])-1]
         if match.IsRevComp {
             rawVals[11] = rawVals[11][1 : len(rawVals[11])-1]
@@ -331,19 +346,22 @@ func parseMatches(genomeName string) (error, Matches) {
             return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
         }
 
-        // necessary swaps to convert reverse complement repeat indexes to positive-strand indexes
+        // Necessary swaps to convert reverse complement repeat
+        // indexes to positive-strand indexes.
         if match.IsRevComp {
             match.RepeatStart = match.RepeatRemains
             match.RepeatEnd = match.RepeatStart
             match.RepeatRemains = match.RepeatRemains + (match.RepeatEnd - match.RepeatStart)
         }
 
-        // decrement match.SeqStart and match.RepeatStart so that they work from a start index of 0 rather than 1
-        // that way, we can use them without modification in slices
+        // Decrement match.SeqStart and match.RepeatStart so that they
+        // work from a start index of 0 rather than 1.
+        // That way, we can use them without modification in slices.
         match.SeqStart--
         match.RepeatStart--
 
-        // "Other" and "Unknown" classes are heirarchically meaningless and really just mean "root", so we remove them
+        // "Other" and "Unknown" classes are heirarchically
+        // meaningless and really just mean "root", so we remove them
         if match.RepeatClass[0] == "Other" || match.RepeatClass[0] == "Unknown" {
             match.RepeatClass = match.RepeatClass[1:]
         }
@@ -370,7 +388,8 @@ func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
         chromName := chromFilename[:len(chromFilename)-3]
         // "my_genome_name", "my_chrom_name"  ->  "my_genome_name/my_chrom_name"
         chromFilepath := strings.Join([]string{genomeName + "-fasta", chromFilename}, "/")
-        // process the ref genome files (*.fa), not the repeat ref files (*.fa.out and *.fa.align) or anything else
+        // process the ref genome files (*.fa), not the repeat ref
+        // files (*.fa.out and *.fa.align) or anything else
         infile, err := os.Open(chromFilepath)
         if err != nil {
             return err, nil
@@ -417,8 +436,9 @@ func New(config Config) (error, *RepeatGenome) {
 
     runtime.GOMAXPROCS(numCPU)
 
-    // we popoulate the RepeatGenome mostly with helper functions
-    // we should consider whether it makes more sense for them to alter the object directly, than to return their results
+    // We popoulate the RepeatGenome mostly with helper functions.
+    // We should consider whether it makes more sense for them to
+    // alter the object directly, than to return their results.
     rg := new(RepeatGenome)
     rg.Name = config.Name
 
@@ -494,12 +514,16 @@ func New(config Config) (error, *RepeatGenome) {
 func (rg *RepeatGenome) getRepeats() {
     // we now populate a list of unique repeat types
     // repeats are stored in the below slice, indexed by their ID
-    // we first determine the necessary size of the slice - we can't use append because matches are not sorted by repeatID
+    // We first determine the necessary size of the slice - we can't
+    // use append because matches are not sorted by repeatID.
 
     rg.RepeatMap = make(map[string]*Repeat)
 
-    // DON'T use the second field of the range - this causes the Match struct to be copied
-    // creating an alias struct (match := rg.Matches[i]) of type Match rather than *Match causes the repeat.Instance item to point to a copy, not the original Match struct
+    // DON'T use the second field of the range - this causes the Match
+    // struct to be copied.
+    // Creating an alias struct (match := rg.Matches[i]) of type Match
+    // rather than *Match causes the repeat.Instance item to point to
+    // a copy, not the original Match struct.
     for i := range rg.Matches {
         match := &rg.Matches[i]
         // don't bother overwriting
@@ -539,7 +563,8 @@ func (rg *RepeatGenome) getClassTree() {
     tree.NodesByID = append(tree.NodesByID, tree.Root)
 
     for _, repeat := range rg.Repeats {
-        // process every heirarchy level (e.g. for "DNA/LINE/TiGGER", process "DNA", then "DNA/LINE", then "DNA/LINE/TiGGER")
+        // process every heirarchy level (e.g. for "DNA/LINE/TiGGER",
+        // process "DNA", then "DNA/LINE", then "DNA/LINE/TiGGER")
         for j := 1; j <= len(repeat.ClassList); j++ {
             thisClass := repeat.ClassList[:j]
             thisClassName := strings.Join(thisClass, "/")
@@ -558,7 +583,8 @@ func (rg *RepeatGenome) getClassTree() {
 
                 tree.ClassNodes[thisClassName] = classNode
                 tree.NodesByID = append(tree.NodesByID, classNode)
-                // first case handles primary classes, as root is implicit and not listed in thisClass
+                // first case handles primary classes, as root is
+                // implicit and not listed in thisClass
                 if j == 1 {
                     classNode.Parent = tree.Root
                 } else {

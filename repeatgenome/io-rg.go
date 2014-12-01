@@ -16,10 +16,12 @@ import (
     "unsafe"
 )
 
-// A magic value, used to give an explicit, declarative error message if the user tries to parse a non-Kraken file.
+// A magic value, used to give an explicit, declarative error message
+// if the user tries to parse a non-Kraken file.
 const magicVal int = 13377331
 
-// Used only for recursively writing the JSON representation of the ClassTree.
+// Used only for recursively writing the JSON representation of the
+// ClassTree.
 type JSONNode struct {
     Name     string      `json:"name"`
     Size     uint64      `json:"size"`
@@ -161,7 +163,9 @@ func (rg *RepeatGenome) WriteMins() error {
 func (kmerInt KmerInt) print() {
     var i uint8
     for i = 0; i < k; i++ {
-        // this tricky bit arithmetic shifts the two bits of interests to the two rightmost positions, then selects them with the and statement
+        // this tricky bit arithmetic shifts the two bits of interests
+        // to the two rightmost positions, then selects them with the
+        // and statement
         switch (kmerInt >> (2 * (k - i - 1))) & 3 {
         case 0:
             fmt.Print("a")
@@ -184,7 +188,9 @@ func (kmerInt KmerInt) print() {
 func (minInt MinInt) print() {
     var i uint8
     for i = 0; i < m; i++ {
-        // this tricky bit arithmetic shifts the two bits of interests to the two rightmost positions, then selects them with the and statement
+        // this tricky bit arithmetic shifts the two bits of interests
+        // to the two rightmost positions, then selects them with the
+        // and statement
         switch (minInt >> (2 * (m - i - 1))) & 3 {
         case 0:
             fmt.Print("a")
@@ -208,7 +214,9 @@ func writeKmerInt(writer io.ByteWriter, seqInt KmerInt) error {
     var i uint8
     var err error
     for i = 0; i < k; i++ {
-        // this tricky bit arithmetic shifts the two bits of interests to the two rightmost positions, then selects them with the and statement
+        // this tricky bit arithmetic shifts the two bits of interests
+        // to the two rightmost positions, then selects them with the
+        // and statement
         switch (seqInt >> (2 * (k - i - 1))) & 3 {
         case 0:
             err = writer.WriteByte('a')
@@ -236,7 +244,9 @@ func writeMinInt(writer io.ByteWriter, seqInt MinInt) error {
     var i uint8
     var err error
     for i = 0; i < m; i++ {
-        // this tricky bit arithmetic shifts the two bits of interests to the two rightmost positions, then selects them with the and statement
+        // this tricky bit arithmetic shifts the two bits of interests
+        // to the two rightmost positions, then selects them with the
+        // and statement
         switch (seqInt >> (2 * (m - i - 1))) & 3 {
         case 0:
             err = writer.WriteByte('a')
@@ -570,8 +580,9 @@ func (classTree *ClassTree) PrintTree() {
     classTree.Root.printTreeRec(0, true)
 }
 
-// doesn't print leaves
-// prevents the terminal from being flooded with Unknowns, Others, and Simple Repeats
+// Doesn't print leaves.
+// Prevents the terminal from being flooded with Unknowns, Others, and
+// Simple Repeats.
 func (classTree *ClassTree) PrintBranches() {
     classTree.Root.printTreeRec(0, false)
 }
@@ -647,7 +658,8 @@ func parseReadSAMs(filepath string) (error, []ReadSAM) {
     return nil, readSAMs
 }
 
-// passes all file names in the dir to parseReadSAMs and returns the concatenated results
+// Passes all file names in the dir to parseReadSAMs and returns the
+// concatenated results.
 func GetReadSAMs(readsDirPath string) (error, []ReadSAM) {
     currDir, err := os.Open(readsDirPath)
     if err != nil {

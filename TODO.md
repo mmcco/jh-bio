@@ -1,21 +1,8 @@
-WARNING!!! This program is currently under development and may be buggy or
-broken.
-
-A barebones (at the moment) Go script for parsing and minimizing RepeatMasker
-output files alongside FASTA reference genomes.
-
-This script expects there to be a subdirectory of the current directory named
-after the reference genome used (e.g. "dm3") that contains the following files:
-   * a RepeatMasker library containing:
-       - the match library (e.g. "dm3.fa.out")
-       - the alignment information (e.g. "dm3.fa.align")
-   * one or more reference genome files in FASTA format with the suffix ".fa"
-
 Premature commenting is the root of all evil, and I have sinned. Please read
-comments skeptically - they will eventually be audited.
+comments skeptically - they are being audited.
 
 Repeat.Instances is populated in an incorrect manner - it seems like it gets
-one per ClassNode.
+one per ClassNode. (fixed, I believe - should recheck)
 
 Are we storing everything we need to in the Kraken data file? Could some of the
 data that parsed libraries rely on (RepeatGenome.Matches, RepeatGenome.Repeats,

@@ -94,8 +94,10 @@ func (minInt MinInt) revComp() MinInt {
 */
 func (kmerInt KmerInt) Minimize() MinInt {
     rcKmerInt := kmerInt.revComp()
-    // despite being minimizers (and therefore expected to be MinInts), we make possMin and currMin KmerInts for ease of manipulation and then convert upon returning
-    // initialize the current best minimizer candidate as MAX_INT
+    // Despite being minimizers (and therefore expected to be
+    // MinInts), we make possMin and currMin KmerInts for ease of
+    // manipulation and then convert upon returning.
+    // Initialize the current best minimizer candidate as MAX_INT
     currMin := ^KmerInt(0)
     var possMin KmerInt
 
@@ -211,7 +213,9 @@ func (seq Seq) GetBase(i uint64) uint8 {
 func (kmerInt KmerInt) MinKey() MinKey {
     rcKmerInt := kmerInt.revComp()
     numPossMins := k - m + 1
-    // despite being minimizers (and therefore expected to be MinInts), we make possMin and currMin KmerInts for ease of manipulation and then convert upon returning
+    // Despite being minimizers (and therefore expected to be
+    // MinInts), we make possMin and currMin KmerInts for ease of
+    // manipulation and then convert upon returning.
     currMin := ^KmerInt(0) // initialize the current best minimizer candidate as MAX_INT
     var currKey MinKey = 0
 
