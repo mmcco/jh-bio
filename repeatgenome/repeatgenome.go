@@ -8,8 +8,8 @@ package repeatgenome
 import (
     "bytes"
     "fmt"
-    "io/ioutil"
     "github.com/plsql/jh-bio/bioutils"
+    "io/ioutil"
     "log"
     "os"
     "runtime"
@@ -404,7 +404,7 @@ func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
                 break
             }
             if seqName != chromName {
-            fmt.Println("WARNING: reference genome is two-dimensional, containing sequences not named after their chromosome.")
+                fmt.Println("WARNING: reference genome is two-dimensional, containing sequences not named after their chromosome.")
                 fmt.Println("Because RepeatMasker supplied only one-dimensional indexing, this may cause unexpected behavior or program failure.")
                 fmt.Println("seqName:", seqName, "\tlen(seqName):", len(seqName))
                 fmt.Println("chrom name:", chromName, "\tlen(chrom name):", len(chromName))

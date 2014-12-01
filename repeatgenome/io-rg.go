@@ -555,7 +555,7 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
         }
         if numBytes != len(kmerBuf) {
             return fmt.Errorf("RepeatGenome.ReadKraken(): only %d kmer bytes read instead of expected %d - on kmer index %d - file %s incorrectly written or corrupted",
-                    numBytes, len(kmerBuf), i, infile.Name())
+                numBytes, len(kmerBuf), i, infile.Name())
         }
 
         rg.Kmers = append(rg.Kmers, *(*Kmer)(unsafe.Pointer(&kmerBuf[0])))
