@@ -352,7 +352,8 @@ func (repeats Repeats) Write(filename string) error {
     }
     defer outfile.Close()
 
-    fmt.Fprintln(outfile, "ID\tName\tNumInstances\tDepth\n")
+    fmt.Fprintln(outfile, "ID\tName\tNumInstances\tDepth")
+    fmt.Fprintln()
     for _, repeat := range repeats {
         var depth int
         if repeat.Name == "root" {
@@ -360,7 +361,8 @@ func (repeats Repeats) Write(filename string) error {
         } else {
             depth = len(repeat.ClassList)
         }
-        fmt.Fprintf(outfile, "%d\t%s\t%d\t%d\n", repeat.ID, repeat.Name, len(repeat.Instances), depth)
+        fmt.Fprintf(outfile, "%d\t%s\t%d\t%d", repeat.ID, repeat.Name, len(repeat.Instances), depth)
+        fmt.Fprintln()
     }
 
     return nil
@@ -373,7 +375,8 @@ func (classNodes ClassNodes) Write(filename string) error {
     }
     defer outfile.Close()
 
-    fmt.Fprintln(outfile, "ID\tName\tDepth\tNumChildren\tIsRepeat\n")
+    fmt.Fprintln(outfile, "ID\tName\tDepth\tNumChildren\tIsRepeat")
+    fmt.Fprintln()
     for _, cn := range classNodes {
         depth := 0
         walker := cn
@@ -381,7 +384,8 @@ func (classNodes ClassNodes) Write(filename string) error {
             depth++
             walker = walker.Parent
         }
-        fmt.Fprintf(outfile, "%d\t%s\t%d\t%d\t%v\n", cn.ID, cn.Name, depth, len(cn.Children), cn.Repeat != nil)
+        fmt.Fprintf(outfile, "%d\t%s\t%d\t%d\t%v", cn.ID, cn.Name, depth, len(cn.Children), cn.Repeat != nil)
+        fmt.Fprintln()
     }
 
     return nil
@@ -394,9 +398,11 @@ func (matches Matches) Write(filename string) error {
     }
     defer outfile.Close()
 
-    fmt.Fprintln(outfile, "ID\tClassNode_ID\tSize\nChrom\tSW_Score\n")
+    fmt.Fprintln(outfile, "ID\tClassNode_ID\tSize\tChrom\tSW_Score")
+    fmt.Fprintln()
     for _, match := range matches {
-        fmt.Fprintf(outfile, "%d\t%d\t%d\t%s\t%d\n", match.ID, match.ClassNode.ID, match.SeqEnd-match.SeqStart, match.SeqName, match.SW_Score)
+        fmt.Fprintf(outfile, "%d\t%d\t%d\t%s\t%d", match.ID, match.ClassNode.ID, match.SeqEnd-match.SeqStart, match.SeqName, match.SW_Score)
+        fmt.Fprintln()
     }
 
     return nil

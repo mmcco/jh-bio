@@ -475,13 +475,15 @@ func New(config Config) (error, *RepeatGenome) {
         krakenFile, err := os.OpenFile(rg.Name+"-lib/"+rg.Name+".kraken", os.O_RDONLY, 0400)
 
         if err == nil { // implies the file already exists
-            fmt.Println("\nKraken library file exists - using contents")
+            fmt.Println()
+            fmt.Println("Kraken library file exists - using contents")
             err = rg.ReadKraken(krakenFile)
             if err != nil {
                 return fmt.Errorf("repeatgenome.New():" + err.Error()), nil
             }
         } else if os.IsNotExist(err) { // the case that there isn't a written file yet
-            fmt.Println("Kraken library file doesn't exist - generating library\n")
+            fmt.Println("Kraken library file doesn't exist - generating library")
+            fmt.Println()
             rg.genKrakenLib()
             err = rg.WriteKraken()
             if err != nil {
