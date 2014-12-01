@@ -243,7 +243,11 @@ func main() {
                 fmt.Println(string(readSAM.Seq), "present in ReadSAM but not Read")
                 os.Exit(1)
             }
-            readSAMResps = append(readSAMResps, repeatgenome.ReadSAMResponse{readSAM, seqToClass[string(readSAM.Seq)]})
+            resp := repeatgenome.ReadSAMResponse{
+                ReadSAM:   readSAM,
+                ClassNode: seqToClass[string(readSAM.Seq)],
+            }
+            readSAMResps = append(readSAMResps, resp)
         }
 
         fmt.Println("parsed", len(readSAMResps), "ReadSAMResponses")
