@@ -43,13 +43,6 @@ func (rg *RepeatGenome) PercentRepeats() float64 {
 }
 
 /*
-   Returns the size in bases of a repeat instance.
-*/
-func (match *Match) Size() uint64 {
-    return match.SeqEnd - match.SeqStart
-}
-
-/*
    Returns the sum of the sizes of all of a repeat sequence type's instances.
 */
 func (repeat *Repeat) Size() uint64 {

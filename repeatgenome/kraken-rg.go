@@ -6,6 +6,7 @@ package repeatgenome
 
 import (
     "fmt"
+    "github.com/plsql/jh-bio/bioutils"
     "runtime"
     "sort"
     "sync"
@@ -59,7 +60,7 @@ func (rg *RepeatGenome) getKmerLCA(kmerInt KmerInt) *ClassNode {
 /*
    Pushes all minimizers of all kmers of each Match in the supplied slice to the supplied chan.
 */
-func (rg *RepeatGenome) getRawMins(matchChan chan *Match, respChan chan MinInt, wg *sync.WaitGroup) {
+func (rg *RepeatGenome) getRawMins(matchChan chan *bioutils.Match, respChan chan MinInt, wg *sync.WaitGroup) {
     k_ := uint64(k)
     for match := range matchChan {
         start, end := match.SeqStart, match.SeqEnd
@@ -90,8 +91,10 @@ func (rg *RepeatGenome) getRawMins(matchChan chan *Match, respChan chan MinInt, 
 }
 
 /*
-   The type returned by RepeatGenome.getMatchKmers(), which process raw kmers.
-   The LCA contained in the Kmer value is not the Kmer's final LCA, but simply the ClassNode ID of the match this instance of the Kmer came from.
+   The type returned by RepeatGenome.getMatchKmers(), which process
+   raw kmers. The LCA contained in the Kmer value is not the Kmer's
+   final LCA, but simply the ClassNode ID of the match this instance
+   of the Kmer came from.
 */
 type ResponsePair struct {
     Kmer   Kmer
@@ -99,10 +102,12 @@ type ResponsePair struct {
 }
 
 /*
-   Pushes all Kmers, along with their minimizers and the ClassNode ID of the match instance the kmer came from.
-   As mentioned above, note that at this point the Kmer's LCA field contains the ClassNode ID of the match processed, not the Kmer's final LCA ID.
+   Pushes all Kmers, along with their minimizers and the ClassNode ID
+   of the match instance the kmer came from. As mentioned above, note
+   that at this point the Kmer's LCA field contains the ClassNode ID
+   of the match processed, not the Kmer's final LCA ID.
 */
-func (rg *RepeatGenome) getMatchKmers(matchChan chan *Match, respChan chan ResponsePair, wg *sync.WaitGroup) {
+func (rg *RepeatGenome) getMatchKmers(matchChan chan *bioutils.Match, respChan chan ResponsePair, wg *sync.WaitGroup) {
     k_ := uint64(k)
     for match := range matchChan {
         start, end := match.SeqStart, match.SeqEnd
@@ -129,7 +134,7 @@ func (rg *RepeatGenome) getMatchKmers(matchChan chan *Match, respChan chan Respo
             kmerInt := TextSeq(matchSeq[i : i+k_]).kmerInt().canonicalRepr()
             var kmer Kmer
             (&kmer).SetInt(kmerInt)
-            (&kmer).SetClassID(match.ClassNode.ID)
+            (&kmer).SetClassID(rg.matchNodes[match].ID)
             respChan <- ResponsePair{kmer, kmerInt.Minimize()}
         }
     }
@@ -137,13 +142,15 @@ func (rg *RepeatGenome) getMatchKmers(matchChan chan *Match, respChan chan Respo
 }
 
 /*
-   This is the first step of Kraken library generation.
-   While it minimizes all repeat sequences genome, it only returns various counts, which are used for memory-allocation efficiency.
-   It counts the number of raw (non-unique and possibly n-containing) kmers and the number of unique minimizers.
-   It also returns a slice containing the number of times each minimizer appears in the genome.
+   This is the first step of Kraken library generation. While it
+   minimizes all repeat sequences genome, it only returns various
+   counts, which are used for memory-allocation efficiency. It counts
+   the number of raw (non-unique and possibly n-containing) kmers and
+   the number of unique minimizers. It also returns a slice containing
+   the number of times each minimizer appears in the genome.
 */
 func (rg *RepeatGenome) krakenFirstPass() (numRawKmers uint64, numRawMins uint64, rawMinCounts []uint32) {
-    matchChan := make(chan *Match)
+    matchChan := make(chan *bioutils.Match)
     go func() {
         for i := range rg.Matches {
             matchChan <- &rg.Matches[i]
@@ -179,9 +186,10 @@ func (rg *RepeatGenome) krakenFirstPass() (numRawKmers uint64, numRawMins uint64
 }
 
 /*
-   Sorts a slice of Kmers that are already sorted by minimizer.
-   The resulting slice is therefore sorted primarily by minimizer and secondarily by kmer.
-   This is done concurrently, using goroutines to sort each minimizer's kmers as a unique slice.
+   Sorts a slice of Kmers that are already sorted by minimizer. The
+   resulting slice is therefore sorted primarily by minimizer and
+   secondarily by kmer. This is done concurrently, using goroutines to
+   sort each minimizer's kmers as a unique slice.
 */
 func (rg *RepeatGenome) sortRawKmers(rawKmers Kmers, rawMinCounts []uint32) {
     wg := new(sync.WaitGroup)
@@ -216,7 +224,8 @@ func (rg *RepeatGenome) sortRawKmers(rawKmers Kmers, rawMinCounts []uint32) {
 }
 
 /*
-   Returns a slice of all kmers in the genome's repeat sequences, unsorted and non-unique.
+   Returns a slice of all kmers in the genome's repeat sequences,
+   unsorted and non-unique.
 */
 func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts []uint32) Kmers {
     // we need a map telling us the next place to insert a kmer associated with any given minimizer
@@ -232,7 +241,7 @@ func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts []uint32) K
 
     // we now populate the raw kmers list, filing each according to its minimizer
     rawKmers := make(Kmers, numRawKmers)
-    matchChan := make(chan *Match, 500)
+    matchChan := make(chan *bioutils.Match, 500)
     go func() {
         for i := range rg.Matches {
             matchChan <- &rg.Matches[i]
@@ -267,7 +276,8 @@ type ReducePair struct {
 }
 
 func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
-    // we first count the uniques so that we don't waste any capacity in the rg.Kmers slice
+    // we first count the uniques so that we don't waste any capacity
+    // in the rg.Kmers slice
     var numUniqs uint64 = 0
     if len(rawKmers) > 0 {
         numUniqs++ // account for the first one, which is skipped
@@ -292,10 +302,12 @@ func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
     }()
 
     for i := 0; i < numCPU; i++ {
-        // this function finds the LCA of a set of kmers and updates the supplied ClassID pointer accordingly
+        // this function finds the LCA of a set of kmers and updates
+        // the supplied ClassID pointer accordingly
         go func() {
             for pair := range pairChan {
-                // grab the LCA of the first kmer in this set, and use it as our starting point
+                // grab the LCA of the first kmer in this set, and use
+                // it as our starting point
                 classID := pair.Set[0].ClassID()
                 currLCA := rg.ClassTree.NodesByID[classID]
 

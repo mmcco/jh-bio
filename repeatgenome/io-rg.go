@@ -353,7 +353,7 @@ func (repeats Repeats) Write(filename string) error {
     defer outfile.Close()
 
     fmt.Fprintln(outfile, "ID\tName\tNumInstances\tDepth")
-    fmt.Fprintln()
+    fmt.Fprintln(outfile)
     for _, repeat := range repeats {
         var depth int
         if repeat.Name == "root" {
@@ -362,7 +362,7 @@ func (repeats Repeats) Write(filename string) error {
             depth = len(repeat.ClassList)
         }
         fmt.Fprintf(outfile, "%d\t%s\t%d\t%d", repeat.ID, repeat.Name, len(repeat.Instances), depth)
-        fmt.Fprintln()
+        fmt.Fprintln(outfile)
     }
 
     return nil
@@ -376,7 +376,7 @@ func (classNodes ClassNodes) Write(filename string) error {
     defer outfile.Close()
 
     fmt.Fprintln(outfile, "ID\tName\tDepth\tNumChildren\tIsRepeat")
-    fmt.Fprintln()
+    fmt.Fprintln(outfile)
     for _, cn := range classNodes {
         depth := 0
         walker := cn
@@ -385,24 +385,7 @@ func (classNodes ClassNodes) Write(filename string) error {
             walker = walker.Parent
         }
         fmt.Fprintf(outfile, "%d\t%s\t%d\t%d\t%v", cn.ID, cn.Name, depth, len(cn.Children), cn.Repeat != nil)
-        fmt.Fprintln()
-    }
-
-    return nil
-}
-
-func (matches Matches) Write(filename string) error {
-    outfile, err := os.Create(filename)
-    if err != nil {
-        return fmt.Errorf("Matches.Write():" + err.Error())
-    }
-    defer outfile.Close()
-
-    fmt.Fprintln(outfile, "ID\tClassNode_ID\tSize\tChrom\tSW_Score")
-    fmt.Fprintln()
-    for _, match := range matches {
-        fmt.Fprintf(outfile, "%d\t%d\t%d\t%s\t%d", match.ID, match.ClassNode.ID, match.SeqEnd-match.SeqStart, match.SeqName, match.SW_Score)
-        fmt.Fprintln()
+        fmt.Fprintln(outfile)
     }
 
     return nil
