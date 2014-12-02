@@ -1,6 +1,8 @@
 /*
-   The core functionality of the package, from which other functions are dispatched.
-   Includes RepeatMasker-related data structure definitions and parsers, as well as the RepeatGenome definition and initializer.
+   The core functionality of the package, from which other functions
+   are dispatched. Includes RepeatMasker-related data structure
+   definitions and parsers, as well as the RepeatGenome definition and
+   initializer.
 */
 
 package repeatgenome
@@ -55,19 +57,30 @@ type Config struct {
 }
 
 /*
-   RepeatGenome.Name - The name of the reference genome, such as "dm3" or "hg38".
-                       This is used to name created directories, and to find directories and files that may be read from, such as a stored Kraken library and reference sequences.
-   RepeatGenome.chroms - A 2-dimensional map mapping a chromosome name to a map of its sequence names to their sequences (in text form).
-                         Actual 2-dimensional mapping is currently impossible because of RepeatMasker's 1-dimensional output.
-   RepeatGenome.Kmers - A slice of all Kmers, sorted primarily by minimizer and secondarily by lexicographical value.
-   RepeatGenome.MinOffsets - Maps a minimizer to its offset in the Kmers slice, or -1 if no kmers of this minimizer were stored.
-   RepeatGenome.MinCounts - Maps a minimizer to the number of stored kmers associated with it.
-   RepeatGenome.SortedMins - A sorted slice of all minimizers of stored kmers.
+   RepeatGenome.Name - The name of the reference genome, such as "dm3"
+       or "hg38". This is used to name created directories, and to find
+       directories and files that may be read from, such as a stored
+       Kraken library and reference sequences.
+   RepeatGenome.chroms - A 2-dimensional map mapping a chromosome name
+       to a map of its sequence names to their sequences (in text form).
+       Actual 2-dimensional mapping is currently impossible because of
+       RepeatMasker's 1-dimensional output.
+   RepeatGenome.Kmers - A slice of all Kmers, sorted primarily by
+       minimizer and secondarily by lexicographical value.
+   RepeatGenome.MinOffsets - Maps a minimizer to its offset in the
+       Kmers slice, or -1 if no kmers of this minimizer were stored.
+   RepeatGenome.MinCounts - Maps a minimizer to the number of stored
+       kmers associated with it.
+   RepeatGenome.SortedMins - A sorted slice of all minimizers of
+       stored kmers.
    RepeatGenome.Matches - All matches, indexed by their assigned IDs.
-   RepeatGenome.ClassTree - Contains all information used for LCA determination and read classification.
-                            It may eventually be collapsed into RepeatGenome, as accessing it is rather verbose.
-   RepeatGenome.Repeats - A slice of all repeats, indexed by their assigned IDs.
-   RepeatGenome.RepeatMap - Maps a fully qualified repeat name, excluding root, to its struct.
+   RepeatGenome.ClassTree - Contains all information used for LCA
+       determination and read classification. It may eventually be
+       collapsed into RepeatGenome, as accessing it is rather verbose.
+   RepeatGenome.Repeats - A slice of all repeats, indexed by their
+       assigned IDs.
+   RepeatGenome.RepeatMap - Maps a fully qualified repeat name,
+       excluding root, to its struct.
 */
 type RepeatGenome struct {
     Name       string
@@ -77,22 +90,28 @@ type RepeatGenome struct {
     MinCounts  []uint32
     SortedMins MinInts
     Matches    bioutils.Matches
-    matchNodes map[*bioutils.Match]*ClassNode
     ClassTree  ClassTree
     Repeats    Repeats
     RepeatMap  map[string]*Repeat
+    // Maps a Match to its associated ClassNode.
+    // Currently used in read classification logic.
+    // Not exposed in API.
+    matchNodes map[*bioutils.Match]*ClassNode
 }
 
 /*
-   Repeat.ID - A unique ID that we assign (not included in RepeatMasker output).
-               Because these are assigned in the order in which they
-               are encountered in <genome name>.fa.out, they are not
-               compatible across even different versions of the same
-               reference genome. This may change.
+   Repeat.ID - A unique ID that we assign (not included in
+       RepeatMasker output). Because these are assigned in the order in
+       which they are encountered in <genome name>.fa.out, they are not
+       compatible across even different versions of the same reference
+       genome. This may change.
    Repeat.Name - The repeat's fully qualified name, excluding root.
-   Repeat.ClassList - A slice of this Repeat's class ancestry from the top of the tree down, excluding root.
-   Repeat.ClassNode - A pointer to the ClassNode which corresponds to this repeat.
-   Repeat.Instances - A slice of pointers to all matches that are instances of this repeat.
+   Repeat.ClassList - A slice of this Repeat's class ancestry from the
+       top of the tree down, excluding root.
+   Repeat.ClassNode - A pointer to the ClassNode which corresponds to
+       this repeat.
+   Repeat.Instances - A slice of pointers to all matches that are
+       instances of this repeat.
 */
 type Repeat struct {
     ID        uint64
@@ -105,16 +124,18 @@ type Repeat struct {
 type Repeats []*Repeat
 
 /*
-   ClassNode.Name - This ClassNode's fully qualified name, excluding root.
-   ClassNode.ID - A unique ID starting at 0 that we assign (not included in RepeatMasker output).
-                  Root has ID 0.
-   ClassNode.Class - This ClassNode's name cut on "/".
-                     This likely isn't necessary, and may be removed in the future.
-   ClassNode.Parent - A pointer to this ClassNode's parent in the ancestry tree.
-                      It should be nil for root and only for root.
-   ClassNode.Children - A slice containing pointers to all of this ClassNode's children in the tree.
-   ClassNode.Repeat - A pointer to this ClassNode's corresonding Repeat, if it has one.
-                      This field is of dubious value.
+   ClassNode.Name - This ClassNode's fully qualified name, excluding
+       root.
+   ClassNode.ID - A unique ID starting at 0 that we assign (not
+       included in RepeatMasker output). Root has ID 0.
+   ClassNode.Class - This ClassNode's name cut on "/". This likely
+       isn't necessary, and may be removed in the future.
+   ClassNode.Parent - A pointer to this ClassNode's parent in the
+       ancestry tree. It should be nil for root and only for root.
+   ClassNode.Children - A slice containing pointers to all of this
+       ClassNode's children in the tree.
+   ClassNode.Repeat - A pointer to this ClassNode's corresonding
+       Repeat, if it has one. This field is of dubious value.
 */
 type ClassNode struct {
     Name     string
@@ -128,12 +149,16 @@ type ClassNode struct {
 type ClassNodes []*ClassNode
 
 /*
-   ClassTree.ClassNodes - Maps a fully qualified class name (excluding root) to that class's ClassNode struct, if it exists.
-                          This is slower than ClassTree.NodesByID, and should only be used when necessary.
-   ClassTree.NodesByID - A slice of pointers to all ClassNode structs, indexed by ID.
-                         This should be the default means of accessing a ClassNode.
-   ClassTree.Root - A pointer to the ClassTree's root, which has name "root" and ID 0.
-                    We explicitly create this - it isn't present in the RepeatMasker output.
+   ClassTree.ClassNodes - Maps a fully qualified class name (excluding
+       root) to that class's ClassNode struct, if it exists. This is
+       slower than ClassTree.NodesByID, and should only be used when
+       necessary.
+   ClassTree.NodesByID - A slice of pointers to all ClassNode structs,
+       indexed by ID. This should be the default means of accessing a
+       ClassNode.
+   ClassTree.Root - A pointer to the ClassTree's root, which has name
+       "root" and ID 0. We explicitly create this - it isn't present in
+       the RepeatMasker output.
 */
 type ClassTree struct {
     ClassNodes map[string](*ClassNode)
@@ -141,7 +166,8 @@ type ClassTree struct {
     Root       *ClassNode
 }
 
-/* A two-bits-per-base sequence of up to 31 bases, with low-order bits occupied first.
+/* A two-bits-per-base sequence of up to 31 bases, with low-order bits
+    occupied first.
    00 = 'a'
    01 = 'c'
    10 = 'g'
@@ -150,37 +176,40 @@ type ClassTree struct {
 type KmerInt uint64
 type KmerInts []KmerInt
 
-// A two-bits-per-base sequence of up to 15 bases, with low-bits occupied first.
+// A two-bits-per-base sequence of up to 15 bases, with low-bits
+// occupied first.
 type MinInt uint32
 type MinInts []MinInt
 
 /*
-   Indexes the base of a kmer that is the starting index of its minimizer.
-   If less than 32, the minimizer is the positive strand representation
-   Otherwise, the minimizer is the reverse complement of kmer[minkey%32 : minkey + (m%32)]
+   Indexes the base of a kmer that is the starting index of its
+   minimizer. If less than 32, the minimizer is the positive strand
+   representation Otherwise, the minimizer is the reverse complement
+   of kmer[minkey%32 : minkey + (m%32)]
 */
 type MinKey uint8
 
 /*
-   A type synonym representing a ClassNode by ID.
-   Used to space-efficiently store a read's classification.
+   A type synonym representing a ClassNode by ID. Used to
+   space-efficiently store a read's classification.
 */
 type ClassID uint16
 
 /*
-   This is what is stored by the main Kraken data structure: RepeatGenome.Kmers
-   The first eight bits are the integer representation of the kmer's sequence (type KmerInt).
-   The last two are the class ID (type ClassID).
+   This is what is stored by the main Kraken data structure:
+   RepeatGenome.Kmers The first eight bits are the integer
+   representation of the kmer's sequence (type KmerInt). The last two
+   are the class ID (type ClassID).
 */
 type Kmer [10]byte
 type Kmers []Kmer
 type PKmers []*Kmer
 
 /*
-   Each base is represented by two bits.
-   High-order bits are occupied first.
-   Remember that Seq.Len is the number of bases contained, while
-   len(Seq.Bytes) is the number of bytes necessary to represent them.
+   Each base is represented by two bits. High-order bits are occupied
+   first. Remember that Seq.Len is the number of bases contained,
+   while len(Seq.Bytes) is the number of bytes necessary to represent
+   them.
 */
 type Seq struct {
     Bytes []byte
@@ -353,7 +382,6 @@ func (rg *RepeatGenome) getRepeats() {
         // don't bother overwriting
         if repeat, exists := rg.RepeatMap[match.RepeatName]; exists {
             repeat.Instances = append(repeat.Instances, match)
-            //match.Repeat = repeat
         } else {
             repeat := Repeat{
                 ID:        uint64(len(rg.Repeats)),
@@ -364,8 +392,6 @@ func (rg *RepeatGenome) getRepeats() {
 
             rg.Repeats = append(rg.Repeats, &repeat)
             rg.RepeatMap[repeat.Name] = &repeat
-
-            //match.Repeat = &repeat
         }
     }
 }
