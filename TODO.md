@@ -1,80 +1,85 @@
-Premature commenting is the root of all evil, and I have sinned. Please read
+*This is more of a brain-dump for me, so that I don't forget potential
+additions, simplifications, or issues. Some of it is likely to be
+outdated, and most of it is probably of little use to someone who isn't
+very familiar with the code.*
+
+* Premature commenting is the root of all evil, and I have sinned. Please read
 comments skeptically - they are being audited.
 
-Repeat.Instances is populated in an incorrect manner - it seems like it gets
+* Repeat.Instances is populated in an incorrect manner - it seems like it gets
 one per ClassNode. (fixed, I believe - should recheck)
 
-Are we storing everything we need to in the Kraken data file? Could some of the
+* Are we storing everything we need to in the Kraken data file? Could some of the
 data that parsed libraries rely on (RepeatGenome.Matches, RepeatGenome.Repeats,
 etc.) be non-deterministic?
 
-Functions for pointer accesses?
+* Functions for pointer accesses?
 
-Reconcile numRawKmers() and krakenFirstPass(), determine when to filter 'n's.
+* Reconcile numRawKmers() and krakenFirstPass(), determine when to filter 'n's.
 
-Ensure that Match.RepeatStart and Match.RepeatEnd are zero-indexed.
+* Ensure that Match.RepeatStart and Match.RepeatEnd are zero-indexed.
 
-A lot of explicit variable types could be safely removed.
+* A lot of explicit variable types could be safely removed.
 
-Consider renaming Kmer to KmerPair or KrakenPair.
+* Consider renaming Kmer to KmerPair or KrakenPair.
 
-Could populate RepeatGenome.ClassTree.ClassNodes in a separate loop.
+* Could populate RepeatGenome.ClassTree.ClassNodes in a separate loop.
 
-Non-exported globals or constants for bit offsets (e.g. that of a Kmer's LCA?)
+* Non-exported globals or constants for bit offsets (e.g. that of a Kmer's LCA?)
 
-A ClassifyReadsFile() function that dispatches to different functions based on
+* A ClassifyReadsFile() function that dispatches to different functions based on
 the reads filetype
 
-We really need a map to get min's indexes/offsets in O(1) time. getMin()
+* We really need a map to get min's indexes/offsets in O(1) time. getMin()
 currently does a binary search.
 
-KmerInt.Minimize() logic could be changed now that minimizers are 32 bits
+* KmerInt.Minimize() logic could be changed now that minimizers are 32 bits
 
-Should a Seq's first field be a *byte to discard the extra two fields? If not,
+* Should a Seq's first field be a *byte to discard the extra two fields? If not,
 we could probably use len() in Seq manipulations.
 
-Should make a flag to prevent writing Kraken library.
+* Should make a flag to prevent writing Kraken library.
 
-Should probably make a file solely for type defs.
+* Should probably make a file solely for type defs.
 
-Reads are currently kept in TextSeq form until the bitter end because, with
+* Reads are currently kept in TextSeq form until the bitter end because, with
 Go's referenced based slices, there's no compelling reason not to, and because
 they're easier (and probably faster) to manipulate than Seqs. This may change
 at some point, though.
 
-If a minimizer is associated with a single repeat type, can we use that
+* If a minimizer is associated with a single repeat type, can we use that
 heuristically?
 
-Error handling should be updated with a custom ParseError type - panics should
+* Error handling should be updated with a custom ParseError type - panics should
 be removed, excepting performance-cricial sequence manipulation functions
 
-Should consider splitting at hyphenated class names like TcMar-Tc1
+* Should consider splitting at hyphenated class names like TcMar-Tc1
 
-The concurrent read-kmer generator could be reintroduced using a select
+* The concurrent read-kmer generator could be reintroduced using a select
 statement.
 
-Should probably restrict activity of chans with directionals
+* Should probably restrict activity of chans with directionals
 
-It would make sense to discard kmers associated with ClassNodes greater than a
+* It would make sense to discard kmers associated with ClassNodes greater than a
 certain size.
 
-Kmer counting should be re-added eventually - it's currently excluded for
+* Kmer counting should be re-added eventually - it's currently excluded for
 performance reasons because we aren't using it.
 
-We should test a version that doesn't cache minimizers, as that seems to be a
+* We should test a version that doesn't cache minimizers, as that seems to be a
 needless bottleneck. It could also be conditional on the number of CPUs
 available.
 
-All sequences containing Ns are currently ignored.
+* All sequences containing Ns are currently ignored.
 
-We should review how to deal with m <= len(match) < k.
+* We should review how to deal with m <= len(match) < k.
 
 For caching efficiency, we should change the minimizer data structure to a
 map-indexed 1D slice of Kmers (not *Kmers). (This technique originated in
 Kraken.)
 
-The sole command line argument is the name of the reference genome (e.g.
+* The sole command line argument is the name of the reference genome (e.g.
 "dm3").
 
-Ensure that the stored Kraken data is referred to as the database, not
+* Ensure that the stored Kraken data is referred to as the database, not
 the library, to prevent confusion (see also no_write_lib).
