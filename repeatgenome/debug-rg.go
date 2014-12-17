@@ -53,22 +53,22 @@ func (rg *RepeatGenome) RunDebugTests() {
 
     fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['DNA/TcMar-Mariner'], rg.ClassTree.ClassNodes['DNA/TcMar-Tc1']).Name:",
         rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["DNA/TcMar-Mariner"],
-        rg.ClassTree.ClassNodes["DNA/TcMar-Tc1"]).Name)
+            rg.ClassTree.ClassNodes["DNA/TcMar-Tc1"]).Name)
     fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['ARTEFACT'], rg.ClassTree.ClassNodes['DNA/TcMar-Tc1']).Name:",
         rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["ARTEFACT"],
-        rg.ClassTree.ClassNodes["DNA/TcMar-Tc1"]).Name)
+            rg.ClassTree.ClassNodes["DNA/TcMar-Tc1"]).Name)
     fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['LINE/LOA'], rg.ClassTree.ClassNodes['root']).Name:",
         rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["LINE/LOA"],
-        rg.ClassTree.ClassNodes["root"]).Name)
+            rg.ClassTree.ClassNodes["root"]).Name)
     fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['Simple_repeat/(T)n'], rg.ClassTree.ClassNodes['Simple_repeat/(T)n']).Name:",
         rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["Simple_repeat/(T)n"],
-        rg.ClassTree.ClassNodes["Simple_repeat/(T)n"]).Name)
+            rg.ClassTree.ClassNodes["Simple_repeat/(T)n"]).Name)
     fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['LTR/Gypsy/MICROPIA_I-int'], rg.ClassTree.ClassNodes['LTR/Gypsy']).Name:",
         rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["LTR/Gypsy/MICROPIA_I-int"],
-        rg.ClassTree.ClassNodes["LTR/Gypsy"]).Name)
+            rg.ClassTree.ClassNodes["LTR/Gypsy"]).Name)
     fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['LTR/Gypsy'], rg.ClassTree.ClassNodes['LTR/Gypsy/MICROPIA_I-int']).Name:",
         rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["LTR/Gypsy"],
-        rg.ClassTree.ClassNodes["LTR/Gypsy/MICROPIA_I-int"]).Name)
+            rg.ClassTree.ClassNodes["LTR/Gypsy/MICROPIA_I-int"]).Name)
     fmt.Println()
 
     fmt.Println("min(5, 7):", min(5, 7))
@@ -199,10 +199,9 @@ func (rawKmers Kmers) checkIntegrity() {
     }
 }
 
-
-func (rg *RepeatGenome) minClasses int {
+func (rg *RepeatGenome) minClasses() int {
     uniqMins := 0
-    minLoop:
+minLoop:
     for minVal, minOffset := range rg.MinOffsets {
         if minCount, exists := rg.minCounts[minVal]; exists {
             soleClass := rg.Kmers[minOffset].ClassID()
