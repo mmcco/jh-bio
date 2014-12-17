@@ -8,6 +8,14 @@ Bold items are algorithmic, the rest are minor*
 * Premature commenting is the root of all evil, and I have sinned. Please read
 comments skeptically - they are being audited.
 
+* Should use iota values for different library and classification types.
+
+* Should make a library for parsing and checking consistency of library
+  format.
+
+* Should do memory checking with a thread in its own function, or in a
+  thread spawned directly from run-rg.
+
 * Repeat.Instances is populated in an incorrect manner - it seems like it gets
 one per ClassNode. (fixed, I believe - should recheck)
 

@@ -223,24 +223,32 @@ func (rg *RepeatGenome) sortRawKmers(rawKmers Kmers, rawMinCounts []uint32) {
     wg.Wait()
 }
 
-/*
-   Returns a slice of all kmers in the genome's repeat sequences,
-   unsorted and non-unique.
-*/
-func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts []uint32) Kmers {
-    // we need a map telling us the next place to insert a kmer associated with any given minimizer
-    // we simply increment a minimizer's offset when we insert a kmer associated with it
-    locMap := make([]int64, minSliceSize, minSliceSize)
-
-    for i := 1; i < len(rg.SortedMins); i++ {
-        thisMin := rg.SortedMins[i]
-        lastMin := rg.SortedMins[i-1]
-        locMap[thisMin] = locMap[lastMin] + int64(rawMinCounts[lastMin])
+func (rg *RepeatGenome) genSimpleMap() map[KmerInt]ClassID {
+    kmerClasses := make(map[KmerInt]ClassID)
+    for respPair := range rg.respPairChan() {
+        kmerInt, classID := respPair.Kmer.Int(), respPair.Kmer.ClassID()
+        prevClassID, exists := kmerClasses[kmerInt]
+        // Assumes that prevClassID will never be 0.
+        // An existing 0 implies that the kmer is already know to be
+        // associated with multiple classes (useless, in this context.
+        if !exists {
+            kmerClasses[kmerInt] = classID
+        } else if prevClassID != classID {
+            kmerClasses[kmerInt] = 0
+        }
     }
-    // could set all unoccupied locMap indices to -1 here for debugging
 
-    // we now populate the raw kmers list, filing each according to its minimizer
-    rawKmers := make(Kmers, numRawKmers)
+    // remove kmers appearing in multiple classes
+    for kmerInt, classID := range kmerClasses {
+        if classID == 0 {
+            delete(kmerClasses, kmerInt)
+        }
+    }
+
+    return kmerClasses
+}
+
+func (rg *RepeatGenome) respPairChan() chan ResponsePair {
     matchChan := make(chan *bioutils.Match, 500)
     go func() {
         for i := range rg.Matches {
@@ -262,6 +270,30 @@ func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts []uint32) K
         go rg.getMatchKmers(matchChan, respChan, wg)
     }
 
+    return respChan
+}
+
+/*
+   Returns a slice of all kmers in the genome's repeat sequences,
+   unsorted and non-unique.
+*/
+func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts []uint32) Kmers {
+    // we need a map telling us the next place to insert a kmer associated with any given minimizer
+    // we simply increment a minimizer's offset when we insert a kmer associated with it
+    locMap := make([]int64, minSliceSize, minSliceSize)
+
+    for i := 1; i < len(rg.SortedMins); i++ {
+        thisMin := rg.SortedMins[i]
+        lastMin := rg.SortedMins[i-1]
+        locMap[thisMin] = locMap[lastMin] + int64(rawMinCounts[lastMin])
+    }
+    // could set all unoccupied locMap indices to -1 here for debugging
+
+    // the code in respPairChan() used to be inline here
+    respChan := rg.respPairChan()
+
+    // we now populate the raw kmers list, filing each according to its minimizer
+    rawKmers := make(Kmers, numRawKmers)
     for respPair := range respChan {
         rawKmers[locMap[respPair.MinInt]] = respPair.Kmer
         locMap[respPair.MinInt]++

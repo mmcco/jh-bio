@@ -196,16 +196,6 @@ func boolToInt(a bool) int {
     }
 }
 
-// has become unnecessarily brief
-/*
-// Returns the indices of the minimizer's kmer range in RepeatGenome.Kmers
-func (rg *RepeatGenome) getMinIndices(minInt MinInt) (uint64, uint64) {
-    startInd := rg.MinOffsets[minInt]
-    endInd := startInd + rg.MinCounts[minInt]
-    return startInd, endInd
-}
-*/
-
 // Takes as an argument the index of a minimizer in RepeatGenome.SortedMins - NOT the minimizer's actual value.
 // Returns a slice of the kmers associated with that minimizer.
 // Intended for non-performance-critical sections, like file writing.
@@ -258,8 +248,4 @@ func zero(byteSlice []byte) {
     for i := range byteSlice {
         byteSlice[i] = 0
     }
-}
-
-func (repeat Repeat) IsRoot() bool {
-    return repeat.ID == 0
 }

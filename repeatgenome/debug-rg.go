@@ -95,8 +95,9 @@ func (rg *RepeatGenome) RunDebugTests() {
 
     rg.printSample(5, 5)
 
-    uniqMins := rg.minClasses()
+    uniqMins, uniqLeafMins := rg.minClasses()
     fmt.Printf("%d minimizers with unique classes\n", uniqMins)
+    fmt.Printf("%d of those are associated with leaves\n", uniqLeafMins)
 }
 
 func DebugSeq() {
@@ -199,14 +200,17 @@ func (rawKmers Kmers) checkIntegrity() {
     }
 }
 
-func (rg *RepeatGenome) minClasses() int {
-    uniqMins := 0
+func (rg *RepeatGenome) minClasses() (int, int) {
+    uniqMins, uniqLeafMins := 0, 0
 minLoop:
     for minVal, minOffset := range rg.MinOffsets {
-        if minCount, exists := rg.minCounts[minVal]; exists {
+        minCount := rg.MinCounts[minVal]
+        if minCount > 0 {
             soleClass := rg.Kmers[minOffset].ClassID()
-            for i := 1; i < minCount; i++ {
-                kmerInd := minOffset + i
+            // continues loop if min has multiple classes
+            var i uint32
+            for i = 1; i < minCount; i++ {
+                kmerInd := uint32(minOffset) + i
                 kmer := rg.Kmers[kmerInd]
                 class := kmer.ClassID()
                 if class != soleClass {
@@ -214,8 +218,11 @@ minLoop:
                 }
             }
             uniqMins++
+            if rg.ClassTree.NodesByID[soleClass].Children == nil {
+                uniqLeafMins++
+            }
         }
     }
 
-    return uniqMins
+    return uniqMins, uniqLeafMins
 }

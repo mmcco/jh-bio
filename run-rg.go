@@ -81,8 +81,6 @@ func main() {
     flag.Parse()
 
     if *cpuProfile {
-        fmt.Println("CPU profiler enabled")
-        fmt.Println()
         os.Mkdir("profiles", os.ModeDir)
         f, err := os.Create("profiles/" + genomeName + ".cpuprof")
         if err != nil {
@@ -90,21 +88,6 @@ func main() {
         }
         pprof.StartCPUProfile(f)
         defer pprof.StopCPUProfile()
-    }
-
-    if *memProfile {
-        fmt.Println("memory profiler enabled")
-        fmt.Println()
-    }
-
-    if *debug {
-        fmt.Println("debug tests enabled")
-        fmt.Println()
-    }
-
-    if *dontWriteLib {
-        fmt.Println("Writing Kraken library to file disabled")
-        fmt.Println()
     }
 
     var k, m uint8
@@ -137,11 +120,6 @@ func main() {
     fmt.Println(comma(uint64(len(rg.ClassTree.ClassNodes))), "class nodes")
     fmt.Println(comma(uint64(len(rg.Matches))), "matches")
     fmt.Println()
-
-    if *lcaClassify {
-        fmt.Println("using LCA logic to classify reads")
-        fmt.Println()
-    }
 
     err, reads := rg.GetSAMReads()
     if err != nil {
