@@ -150,7 +150,7 @@ func main() {
     }
     respChan := rg.GetClassChan(reads, *lcaClassify)
     startTime := time.Now()
-    for _ = range respChan {
+    for range respChan {
     }
     netTime := time.Since(startTime)
 
@@ -255,6 +255,4 @@ func main() {
         fmt.Printf("%.2f%% of classified reads overlapped an instance of their assigned repeat class\n", rg.PercentTrueClassifications(readSAMResps, false))
         fmt.Printf("%.2f%% of classified reads overlapped an instance of their assigned repeat class (strict)\n\n", rg.PercentTrueClassifications(readSAMResps, true))
     }
-
-    fmt.Println(rg.Name, "successfully generated - exiting")
 }

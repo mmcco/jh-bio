@@ -1,7 +1,9 @@
-*This is more of a brain-dump for me, so that I don't forget potential
-additions, simplifications, or issues. Some of it is likely to be
+*This is more of a brain-dump for me so that I don't forget potential
+additions, simplifications, or issues. Some of it is likely
 outdated, and most of it is probably of little use to someone who isn't
-very familiar with the code.*
+very familiar with the code.
+
+Bold items are algorithmic, the rest are minor*
 
 * Premature commenting is the root of all evil, and I have sinned. Please read
 comments skeptically - they are being audited.
@@ -13,7 +15,7 @@ one per ClassNode. (fixed, I believe - should recheck)
 data that parsed libraries rely on (RepeatGenome.Matches, RepeatGenome.Repeats,
 etc.) be non-deterministic?
 
-* Functions for pointer accesses?
+* Functions for pointer accesses? (Done, with a few odd exceptions)
 
 * Reconcile numRawKmers() and krakenFirstPass(), determine when to filter 'n's.
 
@@ -37,8 +39,6 @@ currently does a binary search.
 
 * Should a Seq's first field be a *byte to discard the extra two fields? If not,
 we could probably use len() in Seq manipulations.
-
-* Should make a flag to prevent writing Kraken library.
 
 * Should probably make a file solely for type defs.
 
@@ -74,12 +74,9 @@ available.
 
 * We should review how to deal with m <= len(match) < k.
 
-For caching efficiency, we should change the minimizer data structure to a
+* For caching efficiency, we should change the minimizer data structure to a
 map-indexed 1D slice of Kmers (not *Kmers). (This technique originated in
 Kraken.)
-
-* The sole command line argument is the name of the reference genome (e.g.
-"dm3").
 
 * Ensure that the stored Kraken data is referred to as the database, not
 the library, to prevent confusion (see also no_write_lib).

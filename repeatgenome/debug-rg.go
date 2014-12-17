@@ -51,12 +51,24 @@ func (rg *RepeatGenome) RunDebugTests() {
     fmt.Println("number of ClassNodes:", len(rg.ClassTree.ClassNodes))
     fmt.Println()
 
-    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['DNA/TcMar-Mariner'], rg.ClassTree.ClassNodes['DNA/TcMar-Tc1']).Name:", rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["DNA/TcMar-Mariner"], rg.ClassTree.ClassNodes["DNA/TcMar-Tc1"]).Name)
-    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['ARTEFACT'], rg.ClassTree.ClassNodes['DNA/TcMar-Tc1']).Name:", rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["ARTEFACT"], rg.ClassTree.ClassNodes["DNA/TcMar-Tc1"]).Name)
-    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['LINE/LOA'], rg.ClassTree.ClassNodes['root']).Name:", rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["LINE/LOA"], rg.ClassTree.ClassNodes["root"]).Name)
-    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['Simple_repeat/(T)n'], rg.ClassTree.ClassNodes['Simple_repeat/(T)n']).Name:", rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["Simple_repeat/(T)n"], rg.ClassTree.ClassNodes["Simple_repeat/(T)n"]).Name)
-    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['LTR/Gypsy/MICROPIA_I-int'], rg.ClassTree.ClassNodes['LTR/Gypsy']).Name:", rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["LTR/Gypsy/MICROPIA_I-int"], rg.ClassTree.ClassNodes["LTR/Gypsy"]).Name)
-    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['LTR/Gypsy'], rg.ClassTree.ClassNodes['LTR/Gypsy/MICROPIA_I-int']).Name:", rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["LTR/Gypsy"], rg.ClassTree.ClassNodes["LTR/Gypsy/MICROPIA_I-int"]).Name)
+    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['DNA/TcMar-Mariner'], rg.ClassTree.ClassNodes['DNA/TcMar-Tc1']).Name:",
+        rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["DNA/TcMar-Mariner"],
+        rg.ClassTree.ClassNodes["DNA/TcMar-Tc1"]).Name)
+    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['ARTEFACT'], rg.ClassTree.ClassNodes['DNA/TcMar-Tc1']).Name:",
+        rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["ARTEFACT"],
+        rg.ClassTree.ClassNodes["DNA/TcMar-Tc1"]).Name)
+    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['LINE/LOA'], rg.ClassTree.ClassNodes['root']).Name:",
+        rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["LINE/LOA"],
+        rg.ClassTree.ClassNodes["root"]).Name)
+    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['Simple_repeat/(T)n'], rg.ClassTree.ClassNodes['Simple_repeat/(T)n']).Name:",
+        rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["Simple_repeat/(T)n"],
+        rg.ClassTree.ClassNodes["Simple_repeat/(T)n"]).Name)
+    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['LTR/Gypsy/MICROPIA_I-int'], rg.ClassTree.ClassNodes['LTR/Gypsy']).Name:",
+        rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["LTR/Gypsy/MICROPIA_I-int"],
+        rg.ClassTree.ClassNodes["LTR/Gypsy"]).Name)
+    fmt.Println("rg.ClassTree.getLCA(rg.ClassTree.ClassNodes['LTR/Gypsy'], rg.ClassTree.ClassNodes['LTR/Gypsy/MICROPIA_I-int']).Name:",
+        rg.ClassTree.getLCA(rg.ClassTree.ClassNodes["LTR/Gypsy"],
+        rg.ClassTree.ClassNodes["LTR/Gypsy/MICROPIA_I-int"]).Name)
     fmt.Println()
 
     fmt.Println("min(5, 7):", min(5, 7))
@@ -82,6 +94,9 @@ func (rg *RepeatGenome) RunDebugTests() {
     fmt.Println()
 
     rg.printSample(5, 5)
+
+    uniqMins := rg.minClasses()
+    fmt.Printf("%d minimizers with unique classes\n", uniqMins)
 }
 
 func DebugSeq() {
@@ -182,4 +197,26 @@ func (rawKmers Kmers) checkIntegrity() {
             os.Exit(1)
         }
     }
+}
+
+
+func (rg *RepeatGenome) minClasses int {
+    uniqMins := 0
+    minLoop:
+    for minVal, minOffset := range rg.MinOffsets {
+        if minCount, exists := rg.minCounts[minVal]; exists {
+            soleClass := rg.Kmers[minOffset].ClassID()
+            for i := 1; i < minCount; i++ {
+                kmerInd := minOffset + i
+                kmer := rg.Kmers[kmerInd]
+                class := kmer.ClassID()
+                if class != soleClass {
+                    continue minLoop
+                }
+            }
+            uniqMins++
+        }
+    }
+
+    return uniqMins
 }
