@@ -285,13 +285,14 @@ func uniqueMins(rg *repeatgenome.RepeatGenome) {
     reps, nonreps, repMap := rg.GetMinMap()
     fmt.Println("len(repMins):", comma(uint64(reps)))
     fmt.Println("len(nonrepMins):", comma(uint64(nonreps)))
-    var uniqs uint64 = 0
-    for _, pos_repeat := range repMap {
+    var total, uniqs uint64 = uint64(len(repMap)), 0
+    for minInt, pos_repeat := range repMap {
         if pos_repeat != nil {
             uniqs++
+            delete(repMap, minInt)
         }
     }
-    fmt.Println(comma(uniqs), "out of", comma(uint64(len(repMap))), "mins are unique")
+    fmt.Println(comma(uniqs), "out of", comma(total), "mins are unique")
 
     err, reads := rg.GetSAMReads()
     if err != nil {
@@ -302,7 +303,7 @@ func uniqueMins(rg *repeatgenome.RepeatGenome) {
     repChan := make(chan *repeatgenome.Repeat, 200)
     for _, read := range reads {
         wg.Add(1)
-        rg.MinClassifyRead(read, repMap, wg, repChan)
+        go rg.MinClassifyRead(read, repMap, wg, repChan)
     }
     go func() {
         wg.Wait()

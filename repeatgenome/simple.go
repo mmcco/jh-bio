@@ -218,7 +218,7 @@ MinLoop:
         minInt := read[i:i+int(m)].minInt()
         if minRepeat, exists := minMap[minInt]; !exists {
             repeat = minRepeat
-        } else if repeat != minRepeat {
+        } else if repeat != nil && minRepeat != nil && repeat != minRepeat {
             repeat = nil
             break
         }
