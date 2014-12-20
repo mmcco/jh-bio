@@ -10,6 +10,7 @@ import (
     "runtime/pprof"
     "strconv"
     "strings"
+    "sync"
     "time"
 )
 
@@ -115,6 +116,9 @@ func main() {
         fmt.Println(err)
         os.Exit(1)
     }
+
+    //uniqueKmers(rg)
+    uniqueMins(rg)
 
     fmt.Println(comma(uint64(len(rg.Repeats))), "repeat types")
     fmt.Println(comma(uint64(len(rg.ClassTree.ClassNodes))), "class nodes")
@@ -233,4 +237,88 @@ func main() {
         fmt.Printf("%.2f%% of classified reads overlapped an instance of their assigned repeat class\n", rg.PercentTrueClassifications(readSAMResps, false))
         fmt.Printf("%.2f%% of classified reads overlapped an instance of their assigned repeat class (strict)\n\n", rg.PercentTrueClassifications(readSAMResps, true))
     }
+}
+
+
+func uniqueKmers(rg *repeatgenome.RepeatGenome) {
+    repChan, nonrepChan := rg.SplitChromsK()
+    nonreps, reps := 0, 0
+    repMap := make(map[repeatgenome.KmerInt]string, 300000000)
+    wg := new(sync.WaitGroup)
+    wg.Add(2)
+    non_repeat := "NON_REPEAT"
+    go func() {
+        for repPair := range repChan {
+            kmerInt, className := repPair.KmerInt, repPair.ClassName
+            reps++
+            class, exists := repMap[kmerInt]
+            if !exists {
+                repMap[kmerInt] = class
+            } else if class != className && class != non_repeat {
+                repMap[kmerInt] = non_repeat
+            }
+        }
+        wg.Done()
+    }()
+    go func() {
+        for nonrepPair := range nonrepChan {
+            kmerInt := nonrepPair.KmerInt
+            nonreps++
+            repMap[kmerInt] = non_repeat
+        }
+        wg.Done()
+    }()
+    wg.Wait()
+    fmt.Println("len(repKmers):", comma(uint64(reps)))
+    fmt.Println("len(nonrepKmers):", comma(uint64(nonreps)))
+    var uniqs uint64 = 0
+    for _, pos_class := range repMap {
+        if pos_class != non_repeat {
+            uniqs++
+        }
+    }
+    fmt.Println(comma(uniqs), "out of", comma(uint64(len(repMap))), "kmers are unique")
+    os.Exit(0)
+}
+
+
+func uniqueMins(rg *repeatgenome.RepeatGenome) {
+    repChan, nonrepChan := rg.SplitChromsM()
+    nonreps, reps := 0, 0
+    repMap := make(map[repeatgenome.MinInt]string, 300000000)
+    wg := new(sync.WaitGroup)
+    wg.Add(2)
+    non_repeat := "NON_REPEAT"
+    go func() {
+        for repPair := range repChan {
+            minInt, className := repPair.MinInt, repPair.ClassName
+            reps++
+            class, exists := repMap[minInt]
+            if !exists {
+                repMap[minInt] = class
+            } else if class != className && class != non_repeat {
+                repMap[minInt] = non_repeat
+            }
+        }
+        wg.Done()
+    }()
+    go func() {
+        for nonrepPair := range nonrepChan {
+            minInt := nonrepPair.MinInt
+            nonreps++
+            repMap[minInt] = non_repeat
+        }
+        wg.Done()
+    }()
+    wg.Wait()
+    fmt.Println("len(repMins):", comma(uint64(reps)))
+    fmt.Println("len(nonrepMins):", comma(uint64(nonreps)))
+    var uniqs uint64 = 0
+    for _, pos_class := range repMap {
+        if pos_class != non_repeat {
+            uniqs++
+        }
+    }
+    fmt.Println(comma(uniqs), "out of", comma(uint64(len(repMap))), "mins are unique")
+    os.Exit(0)
 }

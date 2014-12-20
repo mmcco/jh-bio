@@ -11,6 +11,7 @@ package repeatgenome
    A type synonym is used to differentiate one-byte-per-base sequences from two-bits-per-base sequences (type Seq), which also use the concrete type []byte.
 */
 type TextSeq []byte
+type TextSeqs []TextSeq
 
 /*
    Returns the reverse complement of the supplied TextSeq.
