@@ -9,7 +9,7 @@ import (
 type matchSpan struct {
     start uint64
     end uint64
-    className string
+    repeat *Repeat
 }
 
 type matchSpans []matchSpan
@@ -37,7 +37,8 @@ func (rg *RepeatGenome) GetMatchSpans() map[string]matchSpans {
             spanMap[match.SeqName] = make
         */
         seqName := match.SeqName
-        matchSpan := matchSpan{match.SeqStart, match.SeqEnd, match.RepeatName}
+        rep := rg.RepeatMap[match.RepeatName]
+        matchSpan := matchSpan{match.SeqStart, match.SeqEnd, rep}
         spanMap[seqName] = append(spanMap[seqName], matchSpan)
     }
 
@@ -51,13 +52,13 @@ func (rg *RepeatGenome) GetMatchSpans() map[string]matchSpans {
 
 type KRespPair struct {
     KmerInt KmerInt
-    ClassName string
+    Repeat *Repeat
 }
 
 
 type MRespPair struct {
     MinInt MinInt
-    ClassName string
+    Repeat *Repeat
 }
 
 
@@ -72,18 +73,18 @@ func (rg *RepeatGenome) SplitChromsK() (chan KRespPair, chan KRespPair) {
         seq := rg.chroms[chromName][chromName]
         var start uint64 = 0
         for _, matchSpan := range matchSpans {
-            mStart, mEnd, className := matchSpan.start, matchSpan.end, matchSpan.className
+            mStart, mEnd, rep := matchSpan.start, matchSpan.end, matchSpan.repeat
             // necessary because of overlapping matches
             if start < mStart {
                 wg.Add(1)
-                go sendKmers(seq[start:mStart], className, k, nonrepChan, wg)
+                go rg.sendKmers(seq[start:mStart], rep, nonrepChan, wg)
             }
             wg.Add(1)
-            go sendKmers(seq[mStart:mEnd], className, k, repChan, wg)
+            go rg.sendKmers(seq[mStart:mEnd], rep, repChan, wg)
             start = mEnd
         }
         wg.Add(1)
-        go sendKmers(seq[start:], "NON_REPEAT", k, nonrepChan, wg)
+        go rg.sendKmers(seq[start:], nil, nonrepChan, wg)
     }
 
     go func() {
@@ -96,7 +97,7 @@ func (rg *RepeatGenome) SplitChromsK() (chan KRespPair, chan KRespPair) {
 }
 
 
-func sendKmers(seq TextSeq, className string, k uint8, c chan KRespPair, wg *sync.WaitGroup) {
+func (rg *RepeatGenome) sendKmers(seq TextSeq, rep *Repeat, c chan KRespPair, wg *sync.WaitGroup) {
     defer wg.Done()
     var numKmers = len(seq) - int(k) + 1
 KmerLoop:
@@ -108,76 +109,10 @@ KmerLoop:
             }
         }
         kmerInt := seq[i:i+int(k)].kmerInt()
-        c <- KRespPair{kmerInt, className}
-        c <- KRespPair{kmerInt.revComp(), className}
+        c <- KRespPair{kmerInt, rep}
+        c <- KRespPair{kmerInt.revComp(), rep}
     }
 }
-
-
-/*
-func (rg *RepeatGenome) getMatchKmers(matchChan chan *bioutils.Match, respChan chan ResponsePair, wg *sync.WaitGroup) {
-    k_ := uint64(k)
-    for match := range matchChan {
-        start, end := match.SeqStart, match.SeqEnd
-        matchSeq := rg.chroms[match.SeqName][match.SeqName][start:end]
-
-        if len(matchSeq) < int(k) {
-            continue
-        }
-        // includes kmers containing n's, which are ignored
-        numRawKmers := end - start - k_ + 1
-
-        var i uint64
-    KmerLoop:
-        for i = 0; i < numRawKmers; i++ {
-
-            var j int64
-            for j = int64(k_) - 1; j >= 0; j-- {
-                if matchSeq[i+uint64(j)] == 'n' {
-                    i += uint64(j)
-                    continue KmerLoop
-                }
-            }
-
-            kmerInt := TextSeq(matchSeq[i : i+k_]).kmerInt().canonicalRepr()
-            var kmer Kmer
-            (&kmer).SetInt(kmerInt)
-            (&kmer).SetClassID(rg.matchNodes[match].ID)
-            respChan <- ResponsePair{kmer, kmerInt.Minimize()}
-        }
-    }
-    wg.Done()
-}
-
-
-/*
-    Returns a channel to which all repeat minimizers are pushed.
-/*
-func (rg *RepeatGenome) minChan() chan ResponsePair {
-    matchChan := make(chan *bioutils.Match, 500)
-    go func() {
-        for i := range rg.Matches {
-            matchChan <- &rg.Matches[i]
-        }
-        close(matchChan)
-    }()
-
-    var wg = new(sync.WaitGroup)
-    wg.Add(numCPU)
-    respChan := make(chan ResponsePair) // do not buffer without additional WaitGroup
-
-    go func() {
-        wg.Wait()
-        close(respChan)
-    }()
-
-    for i := 0; i < numCPU; i++ {
-        go rg.getMatchKmers(matchChan, respChan, wg)
-    }
-
-    return respChan
-}
-*/
 
 
 func (rg *RepeatGenome) SplitChromsM() (chan MRespPair, chan MRespPair) {
@@ -191,18 +126,18 @@ func (rg *RepeatGenome) SplitChromsM() (chan MRespPair, chan MRespPair) {
         seq := rg.chroms[chromName][chromName]
         var start uint64 = 0
         for _, matchSpan := range matchSpans {
-            mStart, mEnd, className := matchSpan.start, matchSpan.end, matchSpan.className
+            mStart, mEnd, rep := matchSpan.start, matchSpan.end, matchSpan.repeat
             // necessary because of overlapping matches
             if start < mStart {
                 wg.Add(1)
-                go sendMins(seq[start:mStart], className, m, nonrepChan, wg)
+                go rg.sendMins(seq[start:mStart], rep, nonrepChan, wg)
             }
             wg.Add(1)
-            go sendMins(seq[mStart:mEnd], className, m, repChan, wg)
+            go rg.sendMins(seq[mStart:mEnd], rep, repChan, wg)
             start = mEnd
         }
         wg.Add(1)
-        go sendMins(seq[start:], "NON_REPEAT", m, nonrepChan, wg)
+        go rg.sendMins(seq[start:], nil, nonrepChan, wg)
     }
 
     go func() {
@@ -215,7 +150,7 @@ func (rg *RepeatGenome) SplitChromsM() (chan MRespPair, chan MRespPair) {
 }
 
 
-func sendMins(seq TextSeq, className string, m uint8, c chan MRespPair, wg *sync.WaitGroup) {
+func (rg *RepeatGenome) sendMins(seq TextSeq, rep *Repeat, c chan MRespPair, wg *sync.WaitGroup) {
     defer wg.Done()
     var numMins = len(seq) - int(m) + 1
 MinLoop:
@@ -227,7 +162,66 @@ MinLoop:
             }
         }
         minInt := seq[i:i+int(m)].minInt()
-        c <- MRespPair{minInt, className}
-        c <- MRespPair{minInt.revComp(), className}
+        c <- MRespPair{minInt, rep}
+        c <- MRespPair{minInt.revComp(), rep}
     }
+}
+
+
+func (rg *RepeatGenome) GetMinMap() (int, int, map[MinInt]*Repeat) {
+    repChan, nonrepChan := rg.SplitChromsM()
+    nonreps, reps := 0, 0
+    repMap := make(map[MinInt]*Repeat, 300000000)
+    wg := new(sync.WaitGroup)
+    wg.Add(2)
+    go func() {
+        for repPair := range repChan {
+            reps++
+            minInt, repeat := repPair.MinInt, repPair.Repeat
+            lastRepeat, exists := repMap[minInt]
+            if !exists {
+                repMap[minInt] = repeat
+            } else if repeat != lastRepeat {
+                repMap[minInt] = nil
+            }
+        }
+        wg.Done()
+    }()
+    go func() {
+        for nonrepPair := range nonrepChan {
+            minInt := nonrepPair.MinInt
+            nonreps++
+            repMap[minInt] = nil
+        }
+        wg.Done()
+    }()
+    wg.Wait()
+
+    return reps, nonreps, repMap
+}
+
+
+func (rg *RepeatGenome) MinClassifyRead(read TextSeq, minMap map[MinInt]*Repeat, wg *sync.WaitGroup, c chan *Repeat) {
+    defer wg.Done()
+    // the repeat we assign this read
+    // nil if we don't find one
+    var repeat *Repeat
+    var numMins = len(read) - int(m) + 1
+MinLoop:
+    for i := 0; i < numMins; i++ {
+        for j := int(m) + i - 1; j >= i; j-- {
+            if read[j] == byte('n') {
+                i += j - i
+                continue MinLoop
+            }
+        }
+        minInt := read[i:i+int(m)].minInt()
+        if minRepeat, exists := minMap[minInt]; !exists {
+            repeat = minRepeat
+        } else if repeat != minRepeat {
+            repeat = nil
+            break
+        }
+    }
+    c <- repeat
 }

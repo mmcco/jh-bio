@@ -243,19 +243,18 @@ func main() {
 func uniqueKmers(rg *repeatgenome.RepeatGenome) {
     repChan, nonrepChan := rg.SplitChromsK()
     nonreps, reps := 0, 0
-    repMap := make(map[repeatgenome.KmerInt]string, 300000000)
+    repMap := make(map[repeatgenome.KmerInt]*repeatgenome.Repeat, 300000000)
     wg := new(sync.WaitGroup)
     wg.Add(2)
-    non_repeat := "NON_REPEAT"
     go func() {
         for repPair := range repChan {
-            kmerInt, className := repPair.KmerInt, repPair.ClassName
             reps++
-            class, exists := repMap[kmerInt]
+            kmerInt, repeat := repPair.KmerInt, repPair.Repeat
+            lastRepeat, exists := repMap[kmerInt]
             if !exists {
-                repMap[kmerInt] = class
-            } else if class != className && class != non_repeat {
-                repMap[kmerInt] = non_repeat
+                repMap[kmerInt] = repeat
+            } else if repeat != lastRepeat {
+                repMap[kmerInt] = nil
             }
         }
         wg.Done()
@@ -264,7 +263,7 @@ func uniqueKmers(rg *repeatgenome.RepeatGenome) {
         for nonrepPair := range nonrepChan {
             kmerInt := nonrepPair.KmerInt
             nonreps++
-            repMap[kmerInt] = non_repeat
+            repMap[kmerInt] = nil
         }
         wg.Done()
     }()
@@ -272,8 +271,8 @@ func uniqueKmers(rg *repeatgenome.RepeatGenome) {
     fmt.Println("len(repKmers):", comma(uint64(reps)))
     fmt.Println("len(nonrepKmers):", comma(uint64(nonreps)))
     var uniqs uint64 = 0
-    for _, pos_class := range repMap {
-        if pos_class != non_repeat {
+    for _, pos_repeat := range repMap {
+        if pos_repeat != nil {
             uniqs++
         }
     }
@@ -283,42 +282,38 @@ func uniqueKmers(rg *repeatgenome.RepeatGenome) {
 
 
 func uniqueMins(rg *repeatgenome.RepeatGenome) {
-    repChan, nonrepChan := rg.SplitChromsM()
-    nonreps, reps := 0, 0
-    repMap := make(map[repeatgenome.MinInt]string, 300000000)
-    wg := new(sync.WaitGroup)
-    wg.Add(2)
-    non_repeat := "NON_REPEAT"
-    go func() {
-        for repPair := range repChan {
-            minInt, className := repPair.MinInt, repPair.ClassName
-            reps++
-            class, exists := repMap[minInt]
-            if !exists {
-                repMap[minInt] = class
-            } else if class != className && class != non_repeat {
-                repMap[minInt] = non_repeat
-            }
-        }
-        wg.Done()
-    }()
-    go func() {
-        for nonrepPair := range nonrepChan {
-            minInt := nonrepPair.MinInt
-            nonreps++
-            repMap[minInt] = non_repeat
-        }
-        wg.Done()
-    }()
-    wg.Wait()
+    reps, nonreps, repMap := rg.GetMinMap()
     fmt.Println("len(repMins):", comma(uint64(reps)))
     fmt.Println("len(nonrepMins):", comma(uint64(nonreps)))
     var uniqs uint64 = 0
-    for _, pos_class := range repMap {
-        if pos_class != non_repeat {
+    for _, pos_repeat := range repMap {
+        if pos_repeat != nil {
             uniqs++
         }
     }
     fmt.Println(comma(uniqs), "out of", comma(uint64(len(repMap))), "mins are unique")
+
+    err, reads := rg.GetSAMReads()
+    if err != nil {
+        fmt.Println(err)
+        os.Exit(1)
+    }
+    wg := new(sync.WaitGroup)
+    repChan := make(chan *repeatgenome.Repeat, 200)
+    for _, read := range reads {
+        wg.Add(1)
+        rg.MinClassifyRead(read, repMap, wg, repChan)
+    }
+    go func() {
+        wg.Wait()
+        close(repChan)
+    }()
+    var class_succ uint64 = 0
+    for repeat := range repChan {
+        if repeat != nil {
+            class_succ++
+        }
+    }
+    fmt.Println(comma(class_succ), "out of", comma(uint64(len(reads))), "classified with unique minimizer")
     os.Exit(0)
 }
