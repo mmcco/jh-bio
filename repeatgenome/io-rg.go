@@ -602,7 +602,7 @@ func readSimSeqReads(filepath string) (error, Seqs) {
 }
 
 type ReadSAM struct {
-    Seq      []byte
+    TextSeq TextSeq
     SeqName  string
     StartInd uint64
 }
@@ -634,7 +634,7 @@ func parseReadSAMs(filepath string) (error, []ReadSAM) {
             return err, nil
         }
 
-        readSAMs[i].Seq = bytes.ToLower(fields[9])
+        readSAMs[i].TextSeq = bytes.ToLower(fields[9])
         readSAMs[i].SeqName = string(fields[2])
         readSAMs[i].StartInd, err = strconv.ParseUint(string(fields[3]), 10, 64)
         if err != nil {

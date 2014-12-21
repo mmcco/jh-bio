@@ -2,7 +2,7 @@ package repeatgenome
 
 import (
     "sort"
-//    "fmt"
+    "fmt"
     "sync"
 )
 
@@ -168,6 +168,39 @@ MinLoop:
 }
 
 
+func (rg *RepeatGenome) GetKmerMap() (int, int, map[KmerInt]*Repeat) {
+    repChan, nonrepChan := rg.SplitChromsK()
+    nonreps, reps := 0, 0
+    repMap := make(map[KmerInt]*Repeat, 300000000)
+    wg := new(sync.WaitGroup)
+    wg.Add(2)
+    go func() {
+        for repPair := range repChan {
+            reps++
+            kmerInt, repeat := repPair.KmerInt, repPair.Repeat
+            lastRepeat, exists := repMap[kmerInt]
+            if !exists {
+                repMap[kmerInt] = repeat
+            } else if repeat != lastRepeat {
+                repMap[kmerInt] = nil
+            }
+        }
+        wg.Done()
+    }()
+    go func() {
+        for nonrepPair := range nonrepChan {
+            kmerInt := nonrepPair.KmerInt
+            nonreps++
+            repMap[kmerInt] = nil
+        }
+        wg.Done()
+    }()
+    wg.Wait()
+
+    return reps, nonreps, repMap
+}
+
+
 func (rg *RepeatGenome) GetMinMap() (int, int, map[MinInt]*Repeat) {
     repChan, nonrepChan := rg.SplitChromsM()
     nonreps, reps := 0, 0
@@ -201,6 +234,44 @@ func (rg *RepeatGenome) GetMinMap() (int, int, map[MinInt]*Repeat) {
 }
 
 
+func (rg *RepeatGenome) KmerClassifyRead(read TextSeq, kmerMap map[KmerInt]*Repeat, wg *sync.WaitGroup, c chan *Repeat) {
+    defer wg.Done()
+    // the repeat we assign this read
+    // nil if we don't find one
+    var repeat *Repeat
+    var numKmers = len(read) - int(m) + 1
+KmerLoop:
+    for i := 0; i < numKmers; i++ {
+        for j := int(m) + i - 1; j >= i; j-- {
+            if read[j] == byte('n') {
+                i += j - i
+                continue KmerLoop
+            }
+        }
+        kmerInt := read[i:i+int(m)].kmerInt()
+        /*
+        if kmerRepeat, exists := kmerMap[kmerInt]; !exists {
+            c <- kmerRepeat
+        }
+        */
+        
+        if kmerRepeat, exists := kmerMap[kmerInt]; exists {
+            if repeat == nil {
+                repeat = kmerRepeat
+            // kmerRepeat is assumed to not be nil
+            // nils in kmerMap must therefore be deleted
+            } else if repeat != kmerRepeat {
+                repeat = nil
+                break
+            }
+        }
+    }
+    c <- repeat
+    //c <- nil
+}
+
+
+/*
 func (rg *RepeatGenome) MinClassifyRead(read TextSeq, minMap map[MinInt]*Repeat, wg *sync.WaitGroup, c chan *Repeat) {
     defer wg.Done()
     // the repeat we assign this read
@@ -216,12 +287,101 @@ MinLoop:
             }
         }
         minInt := read[i:i+int(m)].minInt()
-        if minRepeat, exists := minMap[minInt]; !exists {
-            repeat = minRepeat
-        } else if repeat != nil && minRepeat != nil && repeat != minRepeat {
-            repeat = nil
-            break
+        if minRepeat, exists := minMap[minInt]; exists {
+            if repeat == nil {
+                repeat = minRepeat
+            // minRepeat is assumed to not be nil
+            // nils in minMap must therefore be deleted
+            } else if repeat != minRepeat {
+                repeat = nil
+                break
+            }
         }
     }
     c <- repeat
+    //c <- nil
+}
+*/
+
+type ReadSAMRepeat struct {
+    ReadSAM ReadSAM
+    Repeat *Repeat
+}
+
+
+func (rg *RepeatGenome) MinClassifyRead(readSAM ReadSAM, minMap map[MinInt]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
+    defer wg.Done()
+    read := readSAM.TextSeq
+    // the repeat we assign this read
+    // nil if we don't find one
+    var repeat *Repeat
+    var numMins = len(read) - int(m) + 1
+MinLoop:
+    for i := 0; i < numMins; i++ {
+        for j := int(m) + i - 1; j >= i; j-- {
+            if read[j] == byte('n') {
+                i += j - i
+                continue MinLoop
+            }
+        }
+        minInt := read[i:i+int(m)].minInt()
+        if minRepeat, exists := minMap[minInt]; exists {
+            if repeat == nil {
+                repeat = minRepeat
+            // minRepeat is assumed to not be nil
+            // nils in minMap must therefore be deleted
+            } else if repeat != minRepeat {
+                repeat = nil
+                break
+            }
+        } else {
+            minInt.print()
+        }
+    }
+    c <- ReadSAMRepeat{readSAM, repeat}
+}
+
+
+func (rg *RepeatGenome) MinClassifyReadVerb(readSAM ReadSAM, minMap map[MinInt]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
+    defer wg.Done()
+    read := readSAM.TextSeq
+    fmt.Println(read)
+    fmt.Println()
+    // the repeat we assign this read
+    // nil if we don't find one
+    var repeat *Repeat
+    var numMins = len(read) - int(m) + 1
+MinLoop:
+    for i := 0; i < numMins; i++ {
+        for j := int(m) + i - 1; j >= i; j-- {
+            if read[j] == byte('n') {
+                i += j - i
+                continue MinLoop
+            }
+        }
+        minInt := read[i:i+int(m)].minInt()
+        if minRepeat, exists := minMap[minInt]; exists {
+            if repeat == nil {
+                repeat = minRepeat
+                fmt.Println("recognized:")
+                fmt.Print("\t"); minInt.print(); fmt.Println()
+                fmt.Printf("\t\t%s\n", repeat.Name)
+            // minRepeat is assumed to not be nil
+            // nils in minMap must therefore be deleted
+            } else if repeat != minRepeat {
+                fmt.Println("conflict:")
+                fmt.Print("\t"); minInt.print(); fmt.Println()
+                fmt.Printf("\t\t%s\n", repeat.Name)
+                repeat = nil
+                fmt.Println("BREAK")
+                break
+            }
+        } else {
+            fmt.Print("\tunrecognized: ")
+            minInt.print()
+            fmt.Println()
+        }
+    }
+    c <- ReadSAMRepeat{readSAM, repeat}
+    //c <- nil
 }

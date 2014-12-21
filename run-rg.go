@@ -125,7 +125,7 @@ func main() {
     fmt.Println(comma(uint64(len(rg.Matches))), "matches")
     fmt.Println()
 
-    err, reads := rg.GetSAMReads()
+    err, reads := rg.GetReads()
     if err != nil {
         fmt.Println(err)
         os.Exit(1)
@@ -138,7 +138,7 @@ func main() {
 
     var numReads, numClassifiedReads, rootReads uint64 = 0, 0, 0
     var responses []repeatgenome.ReadResponse
-    err, reads = rg.GetSAMReads()
+    err, reads = rg.GetReads()
     if err != nil {
         fmt.Println(err)
         os.Exit(1)
@@ -201,14 +201,8 @@ func main() {
     if *verifyClass {
         fmt.Println("...using SAM-formatted reads to check classification correctness...")
 
-        workingDirName, err := os.Getwd()
-        if err != nil {
-            fmt.Println(err)
-            os.Exit(1)
-        }
-        readsDirName := workingDirName + "/" + rg.Name + "-reads"
-
-        err, readSAMs := repeatgenome.GetReadSAMs(readsDirName)
+        
+        err, readSAMs := repeatgenome.GetReadSAMs(getReadsDirName(genomeName))
         if err != nil {
             fmt.Println(err)
             os.Exit(1)
@@ -221,13 +215,13 @@ func main() {
 
         readSAMResps := []repeatgenome.ReadSAMResponse{}
         for _, readSAM := range readSAMs {
-            if _, exists := seqToClass[string(readSAM.Seq)]; !exists {
-                fmt.Println(string(readSAM.Seq), "present in ReadSAM but not Read")
+            if _, exists := seqToClass[string(readSAM.TextSeq)]; !exists {
+                fmt.Println(string(readSAM.TextSeq), "present in ReadSAM but not Read")
                 os.Exit(1)
             }
             resp := repeatgenome.ReadSAMResponse{
                 ReadSAM:   readSAM,
-                ClassNode: seqToClass[string(readSAM.Seq)],
+                ClassNode: seqToClass[string(readSAM.TextSeq)],
             }
             readSAMResps = append(readSAMResps, resp)
         }
@@ -240,6 +234,7 @@ func main() {
 }
 
 
+/*
 func uniqueKmers(rg *repeatgenome.RepeatGenome) {
     repChan, nonrepChan := rg.SplitChromsK()
     nonreps, reps := 0, 0
@@ -279,6 +274,48 @@ func uniqueKmers(rg *repeatgenome.RepeatGenome) {
     fmt.Println(comma(uniqs), "out of", comma(uint64(len(repMap))), "kmers are unique")
     os.Exit(0)
 }
+*/
+
+
+func uniqueKmers(rg *repeatgenome.RepeatGenome) {
+    reps, nonreps, repMap := rg.GetKmerMap()
+    fmt.Println("len(repKmers):", comma(uint64(reps)))
+    fmt.Println("len(nonrepKmers):", comma(uint64(nonreps)))
+    var total, uniqs uint64 = uint64(len(repMap)), 0
+    for kmerInt, pos_repeat := range repMap {
+        if pos_repeat != nil {
+            uniqs++
+        } else {
+            delete(repMap, kmerInt)
+        }
+    }
+    fmt.Println(comma(uniqs), "out of", comma(total), "kmers are unique")
+
+    err, reads := rg.GetReads()
+    if err != nil {
+        fmt.Println(err)
+        os.Exit(1)
+    }
+    wg := new(sync.WaitGroup)
+    repChan := make(chan *repeatgenome.Repeat, 200)
+    for _, read := range reads {
+        wg.Add(1)
+        go rg.KmerClassifyRead(read, repMap, wg, repChan)
+    }
+    go func() {
+        wg.Wait()
+        close(repChan)
+    }()
+    var class_succ, total_class uint64 = 0, 0
+    for repeat := range repChan {
+        total_class++
+        if repeat != nil {
+            class_succ++
+        }
+    }
+    fmt.Println(comma(class_succ), "out of", comma(total_class), "classified with unique kmer")
+    os.Exit(0)
+}
 
 
 func uniqueMins(rg *repeatgenome.RepeatGenome) {
@@ -289,32 +326,52 @@ func uniqueMins(rg *repeatgenome.RepeatGenome) {
     for minInt, pos_repeat := range repMap {
         if pos_repeat != nil {
             uniqs++
+        } else {
             delete(repMap, minInt)
         }
     }
     fmt.Println(comma(uniqs), "out of", comma(total), "mins are unique")
 
-    err, reads := rg.GetSAMReads()
+    readsDirName := getReadsDirName(rg.Name)
+    err, readSAMs := repeatgenome.GetReadSAMs(readsDirName)
     if err != nil {
         fmt.Println(err)
         os.Exit(1)
     }
     wg := new(sync.WaitGroup)
-    repChan := make(chan *repeatgenome.Repeat, 200)
-    for _, read := range reads {
+    repChan := make(chan repeatgenome.ReadSAMRepeat, 200)
+    //wg.Add(1)
+    //rg.MinClassifyReadVerb(reads[0], repMap, wg, repChan)
+    //os.Exit(0)
+    for _, readSAM := range readSAMs {
         wg.Add(1)
-        go rg.MinClassifyRead(read, repMap, wg, repChan)
+        go rg.MinClassifyRead(readSAM, repMap, wg, repChan)
     }
     go func() {
         wg.Wait()
         close(repChan)
     }()
-    var class_succ uint64 = 0
-    for repeat := range repChan {
-        if repeat != nil {
+    var class_succ, total_class, corr_class uint64 = 0, 0, 0
+    for readSAMRepeat := range repChan {
+        total_class++
+        if readSAMRepeat.Repeat != nil {
             class_succ++
+            if rg.RepeatIsCorrect(readSAMRepeat, true) {
+                corr_class++
+            }
         }
     }
-    fmt.Println(comma(class_succ), "out of", comma(uint64(len(reads))), "classified with unique minimizer")
+    fmt.Println(comma(class_succ), "out of", comma(total_class),
+        "classified with unique minimizer")
     os.Exit(0)
+}
+
+
+func getReadsDirName(genomeName string) string {
+    workingDirName, err := os.Getwd()
+    if err != nil {
+        fmt.Println(err)
+        os.Exit(1)
+    }
+    return workingDirName + "/" + genomeName + "-reads"
 }
