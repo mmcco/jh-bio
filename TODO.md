@@ -94,5 +94,8 @@ Kraken.)
 * Ensure that the stored Kraken data is referred to as the database, not
 the library, to prevent confusion (see also no_write_lib).
 
-* Not storing reverse complements in the library and instead computing
-  them in classifier functions would make the library a lot smaller.
+* Record in the documenation that you cannot simply store
+  reverse complements in the library and instead compute
+  them in classifier functions because the a kmer and its complement
+  could have different classifications. Instead, the best method is to
+  use the lexicographically smaller of the two in all cases.

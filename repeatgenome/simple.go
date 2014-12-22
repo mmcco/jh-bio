@@ -234,6 +234,7 @@ func (rg *RepeatGenome) GetMinMap() (int, int, map[MinInt]*Repeat) {
 }
 
 
+/*
 func (rg *RepeatGenome) KmerClassifyRead(read TextSeq, kmerMap map[KmerInt]*Repeat, wg *sync.WaitGroup, c chan *Repeat) {
     defer wg.Done()
     // the repeat we assign this read
@@ -249,11 +250,6 @@ KmerLoop:
             }
         }
         kmerInt := read[i:i+int(m)].kmerInt()
-        /*
-        if kmerRepeat, exists := kmerMap[kmerInt]; !exists {
-            c <- kmerRepeat
-        }
-        */
         
         if kmerRepeat, exists := kmerMap[kmerInt]; exists {
             if repeat == nil {
@@ -269,6 +265,7 @@ KmerLoop:
     c <- repeat
     //c <- nil
 }
+*/
 
 
 /*
@@ -334,8 +331,37 @@ MinLoop:
                 repeat = nil
                 break
             }
-        } else {
-            minInt.print()
+        }
+    }
+    c <- ReadSAMRepeat{readSAM, repeat}
+}
+
+
+func (rg *RepeatGenome) KmerClassifyRead(readSAM ReadSAM, kmerMap map[KmerInt]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
+    defer wg.Done()
+    read := readSAM.TextSeq
+    // the repeat we assign this read
+    // nil if we don't find one
+    var repeat *Repeat
+    var numKmers = len(read) - int(k) + 1
+KmerLoop:
+    for i := 0; i < numKmers; i++ {
+        for j := int(k) + i - 1; j >= i; j-- {
+            if read[j] == byte('n') {
+                i += j - i
+                continue KmerLoop
+            }
+        }
+        kmerInt := read[i:i+int(k)].kmerInt()
+        if kmerRepeat, exists := kmerMap[kmerInt]; exists {
+            if repeat == nil {
+                repeat = kmerRepeat
+            // kmerRepeat is assumed to not be nil
+            // nils in kmerMap must therefore be deleted
+            } else if repeat != kmerRepeat {
+                repeat = nil
+                break
+            }
         }
     }
     c <- ReadSAMRepeat{readSAM, repeat}
@@ -382,6 +408,69 @@ MinLoop:
             fmt.Println()
         }
     }
-    c <- ReadSAMRepeat{readSAM, repeat}
-    //c <- nil
+    rsr :=  ReadSAMRepeat{readSAM, repeat}
+    if repeat == nil {
+        fmt.Print("o NIL o\n\n")
+    } else {
+        if rg.RepeatIsCorrect(rsr, true) {
+            fmt.Print("+ CORRECT +\n\n")
+        } else {
+            fmt.Print("- WRONG -\n\n")
+        }
+    }
+    c <- rsr
+}
+
+
+func (rg *RepeatGenome) KmerClassifyReadVerb(readSAM ReadSAM, kmerMap map[KmerInt]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
+    defer wg.Done()
+    read := readSAM.TextSeq
+    fmt.Println(read)
+    fmt.Println()
+    // the repeat we assign this read
+    // nil if we don't find one
+    var repeat *Repeat
+    var numMins = len(read) - int(k) + 1
+MinLoop:
+    for i := 0; i < numMins; i++ {
+        for j := int(k) + i - 1; j >= i; j-- {
+            if read[j] == byte('n') {
+                i += j - i
+                continue MinLoop
+            }
+        }
+        kmerInt := read[i:i+int(k)].kmerInt()
+        if kmerRepeat, exists := kmerMap[kmerInt]; exists {
+            if repeat == nil {
+                repeat = kmerRepeat
+                fmt.Println("recognized:")
+                fmt.Print("\t"); kmerInt.print(); fmt.Println()
+                fmt.Printf("\t\t%s\n", repeat.Name)
+            // kmerRepeat is assumed to not be nil
+            // nils in kmerMap must therefore be deleted
+            } else if repeat != kmerRepeat {
+                fmt.Println("conflict:")
+                fmt.Print("\t"); kmerInt.print(); fmt.Println()
+                fmt.Printf("\t\t%s\n", repeat.Name)
+                repeat = nil
+                fmt.Println("BREAK")
+                break
+            }
+        } else {
+            fmt.Print("\tunrecognized: ")
+            kmerInt.print()
+            fmt.Println()
+        }
+    }
+    rsr :=  ReadSAMRepeat{readSAM, repeat}
+    if repeat == nil {
+        fmt.Print("o NIL o\n\n")
+    } else {
+        if rg.RepeatIsCorrect(rsr, true) {
+            fmt.Print("+ CORRECT +\n\n")
+        } else {
+            fmt.Print("- WRONG -\n\n")
+        }
+    }
+    c <- rsr
 }
