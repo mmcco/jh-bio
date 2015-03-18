@@ -146,7 +146,7 @@ func (rg *RepeatGenome) recNodeSearch(classNode *ClassNode, readSAM ReadSAM, str
                 continue
             }
             // must compute where the read ends
-            endInd := readSAM.StartInd + uint64(len(readSAM.Seq))
+            endInd := readSAM.StartInd + uint64(len(readSAM.TextSeq))
             overlap := readSAM.SeqName == match.SeqName && readSAM.StartInd < match.SeqEnd && endInd > match.SeqStart
             if overlap && !strict {
                 return true
@@ -172,6 +172,39 @@ func (rg *RepeatGenome) recNodeSearch(classNode *ClassNode, readSAM ReadSAM, str
     return false
 }
 
+
+func (rg *RepeatGenome) RepeatIsCorrect(readSAMRepeat ReadSAMRepeat, strict bool) bool {
+    // awkward unpacking - maybe use separate args?
+    readSAM, repeat := readSAMRepeat.ReadSAM, readSAMRepeat.Repeat
+    read, seqName, startInd := readSAM.TextSeq, readSAM.SeqName, readSAM.StartInd
+    if repeat == nil {
+        // We will for now use a panic rather than an error.
+        // This is for speed and simplicity, and because the caller
+        // logically should ensure than the repeat is non-nil.
+        panic("RepeatGenome.RepeatIsCorrect(): readSAMRepeat.Repeat is nil")
+    }
+    for _, match := range repeat.Instances {
+        if match.SeqName != seqName {
+            continue
+        }
+        // must compute where the read ends - it isn't stored
+        endInd := readSAM.StartInd + uint64(len(read))
+        overlap := seqName == match.SeqName && startInd < match.SeqEnd && endInd > match.SeqStart
+        if overlap && !strict {
+            return true
+        } else if overlap && strict {
+            // below logic is for checking for at least rg.K overlap
+            var overlap uint64 = endInd - match.SeqStart
+            if startInd > match.SeqStart {
+                overlap -= startInd - match.SeqStart
+            }
+            if overlap >= uint64(k) {
+                return true
+            }
+        }
+    }
+    return false
+}
 /*
 func TestNodeSearch(classNode *ClassNode, readSAM ReadSAM) bool {
     if classNode == nil {

@@ -8,6 +8,9 @@ Bold items are algorithmic, the rest are minor*
 * Premature commenting is the root of all evil, and I have sinned. Please read
 comments skeptically - they are being audited.
 
+* *We have few enough minimizers that we could easily map them to their
+  relevant locations in the repeat type of interest.*
+
 * Should use iota values for different library and classification types.
 
 * Should make a library for parsing and checking consistency of library
@@ -18,6 +21,8 @@ comments skeptically - they are being audited.
 
 * Repeat.Instances is populated in an incorrect manner - it seems like it gets
 one per ClassNode. (fixed, I believe - should recheck)
+
+* Maybe the core read classifier should be in C.
 
 * Are we storing everything we need to in the Kraken data file? Could some of the
 data that parsed libraries rely on (RepeatGenome.Matches, RepeatGenome.Repeats,
@@ -88,3 +93,9 @@ Kraken.)
 
 * Ensure that the stored Kraken data is referred to as the database, not
 the library, to prevent confusion (see also no_write_lib).
+
+* Record in the documenation that you cannot simply store
+  reverse complements in the library and instead compute
+  them in classifier functions because the a kmer and its complement
+  could have different classifications. Instead, the best method is to
+  use the lexicographically smaller of the two in all cases.
