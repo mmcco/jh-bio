@@ -372,14 +372,45 @@ func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
 
 }
 
+/*
+    Be sure to mirror all changes in verbose version below.
+*/
 func (rg *RepeatGenome) genKrakenLib() {
+
+    numRawKmers, numRawMins, rawMinCounts := rg.krakenFirstPass()
+    rg.SortedMins = make(MinInts, 0, numRawMins)
+    for minInt, cnt := range rawMinCounts {
+        if cnt > 0 {
+            rg.SortedMins = append(rg.SortedMins, uint32(minInt))
+        }
+    }
+    sort.Sort(rg.SortedMins)
+    rawKmers := rg.getRawKmers(numRawKmers, rawMinCounts)
+    runtime.GC() // manual memory clear
+
+    if debug {
+        rawKmers.checkIntegrity()
+    }
+
+    rg.sortRawKmers(rawKmers, rawMinCounts)
+    rg.uniqKmers(rawKmers)
+    rawKmers = nil
+    runtime.GC()
+
+    rg.MinCounts = make([]uint32, minSliceSize, minSliceSize)
+    for _, kmer := range rg.Kmers {
+        min := bioutils.Minimize(kmer.Int())
+        rg.MinCounts[min]++
+    }
+    rg.populateMinOffsets()
+}
+
+func (rg *RepeatGenome) genKrakenLibVerbose() {
 
     fmt.Println()
     fmt.Println("beginning first pass")
     numRawKmers, numRawMins, rawMinCounts := rg.krakenFirstPass()
     fmt.Println("first pass complete")
-
-    //fmt.Println("len(rawMinCounts):", comma(uint64(len(rawMinCounts))))
 
     fmt.Println("expecting", comma(int(numRawMins)), "unique minimizers")
     fmt.Println("expecting", comma(int(numRawKmers)), "non-unique kmers")

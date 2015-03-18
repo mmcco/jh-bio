@@ -138,24 +138,6 @@ func (kmers Kmers) Less(i, j int) bool {
     return kmers[i].Int() < kmers[j].Int()
 }
 
-// sorts by both min and kmer - too slow
-/*
-func (kmers Kmers) Less(i, j int) bool {
-    iVal := *(*uint64)(unsafe.Pointer(&kmers[i][0]))
-    jVal := *(*uint64)(unsafe.Pointer(&kmers[j][0]))
-    iMin := iVal.Minimize()
-    jMin := jVal.Minimize()
-
-    if iMin < jMin {
-        return true
-    } else if iMin > jMin {
-        return false
-    } else {
-        return iVal < jVal
-    }
-}
-*/
-
 func (minInts MinInts) Len() int {
     return len(minInts)
 }

@@ -248,8 +248,8 @@ func parseGenome(genomeName string) (error, Chroms) {
             if seqName != chromName {
                 fmt.Println("WARNING: reference genome is two-dimensional, containing sequences not named after their chromosome.")
                 fmt.Println("Because RepeatMasker supplied only one-dimensional indexing, this may cause unexpected behavior or program failure.")
-                fmt.Println("seqName:", seqName, "\tlen(seqName):", len(seqName))
-                fmt.Println("chrom name:", chromName, "\tlen(chrom name):", len(chromName))
+                fmt.Printf("seqName: %s\tlen(seqName): %d\n", seqName, len(seqName))
+                fmt.Printf("chrom name: %s\tlen(chrom name): %d\n", chromName, len(chromName))
                 warned = true
             }
         }
@@ -302,7 +302,7 @@ func New(config Config) (error, *RepeatGenome) {
     rg.getClassTree()
 
     if config.ForceGen {
-        rg.genKrakenLib()
+        rg.genKrakenLibVerbose()
         err = rg.WriteKraken()
         if err != nil {
             return err, nil
@@ -320,7 +320,7 @@ func New(config Config) (error, *RepeatGenome) {
         } else if os.IsNotExist(err) { // the case that there isn't a written file yet
             fmt.Println("Kraken library file doesn't exist - generating library")
             fmt.Println()
-            rg.genKrakenLib()
+            rg.genKrakenLibVerbose()
             err = rg.WriteKraken()
             if err != nil {
                 return err, nil
