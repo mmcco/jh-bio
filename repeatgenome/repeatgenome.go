@@ -1,8 +1,7 @@
 /*
-   The core of the package, from which other functions
-   are dispatched. Includes RepeatMasker-related data structure
-   definitions and parsers, as well as the RepeatGenome definition and
-   initializer.
+   The core of the package, from which other functions are dispatched. Includes
+   RepeatMasker-related data structure definitions and parsers, as well as the
+   RepeatGenome definition and initializer.
 */
 
 package repeatgenome
@@ -19,24 +18,15 @@ import (
     "strings"
 )
 
-// These variables are used ubiquitously, especially in
-// performance-critical functions, so we grudgingly make them globals.
-// K is the kmer size (in basepairs).
-// M is the minimizer size, which must be <= k.
-var k, m uint8
 
-// kMask and mMask contain k and m consecutive right aligned 1 bits
-// respectively (e.g. "0000011111111").
-var kMask, mMask uint64
+// minSliceSize is the size of a slice that contains an index for each possible
+// mMer.
+const minSliceSize uint64 = 1 << (2 * bioutils.M)
 
-// minSliceSize is the size of a slice that contains indexes for all
-// possible mMers.
-// It is calculated as: 1 << m
-var minSliceSize uint64
 var debug bool
 
-// This is used as a rudimentary way of determining how many
-// goroutines to spawn in concurrent sections.
+// This is used as a rudimentary way of determining how many goroutines to
+// spawn in concurrent sections.
 var numCPU = runtime.NumCPU()
 
 // Used to write heap memory profile.
@@ -46,8 +36,6 @@ var memProfFile *os.File
 // constructs and returns a new RepeatGenome.
 type Config struct {
     Name       string
-    K          uint8
-    M          uint8
     Debug      bool
     CPUProfile bool
     MemProfile bool
@@ -277,16 +265,6 @@ func parseGenome(genomeName string) (error, Chroms) {
 func New(config Config) (error, *RepeatGenome) {
     debug = config.Debug
 
-    if config.K < config.M {
-        return fmt.Errorf("m must be <= k"), nil
-    }
-    k = config.K
-    m = config.M
-    minSliceSize = 1 << (2 * m)
-    kMask = (1 << (2 * k)) - 1
-    mMask = (1 << (2 * m)) - 1
-    fmt.Println("k =", k)
-    fmt.Println("m =", m)
 
     runtime.GOMAXPROCS(numCPU)
 

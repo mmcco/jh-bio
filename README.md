@@ -81,8 +81,6 @@ contain all reads in SAM format, with the `.sam` suffix.
 
 ###Command Line Options
 
-* `-k`:	The k-mer length. Defaults to the maximum, 31.
-* `-m`:	The minimizer length. This must be shorter than the k-mer length. Defaults to the maximum, 15.
 * `-force_gen`:	Force generation of the Kraken database. By default, the database will be read from file if it already exists.
 * `-write_stats`:	Write various tab-delimited and JSON files representing peripheral Kraken and repeat data.
 * `-no_write_lib`:	Do not write the database to file.

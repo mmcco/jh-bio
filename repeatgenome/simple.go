@@ -3,6 +3,7 @@ package repeatgenome
 import (
     "sort"
     "fmt"
+    "github.com/plsql/jh-bio/bioutils"
     "sync"
 )
 
@@ -51,13 +52,13 @@ func (rg *RepeatGenome) GetMatchSpans() map[string]matchSpans {
 
 
 type KRespPair struct {
-    KmerInt KmerInt
+    KmerInt uint64
     Repeat *Repeat
 }
 
 
 type MRespPair struct {
-    MinInt MinInt
+    MinInt uint32
     Repeat *Repeat
 }
 
@@ -97,20 +98,20 @@ func (rg *RepeatGenome) SplitChromsK() (chan KRespPair, chan KRespPair) {
 }
 
 
-func (rg *RepeatGenome) sendKmers(seq TextSeq, rep *Repeat, c chan KRespPair, wg *sync.WaitGroup) {
+func (rg *RepeatGenome) sendKmers(seq []byte, rep *Repeat, c chan KRespPair, wg *sync.WaitGroup) {
     defer wg.Done()
-    var numKmers = len(seq) - int(k) + 1
+    var numKmers = len(seq) - bioutils.K + 1
 KmerLoop:
     for i := 0; i < numKmers; i++ {
-        for j := int(k) + i - 1; j >= i; j-- {
+        for j := bioutils.K + i - 1; j >= i; j-- {
             if seq[j] == byte('n') {
                 i += j - i
                 continue KmerLoop
             }
         }
-        kmerInt := seq[i:i+int(k)].kmerInt()
+        kmerInt := bioutils.BytesToU64(seq[i:i+bioutils.K])
         c <- KRespPair{kmerInt, rep}
-        c <- KRespPair{kmerInt.revComp(), rep}
+        c <- KRespPair{bioutils.RevComp64(kmerInt), rep}
     }
 }
 
@@ -150,28 +151,28 @@ func (rg *RepeatGenome) SplitChromsM() (chan MRespPair, chan MRespPair) {
 }
 
 
-func (rg *RepeatGenome) sendMins(seq TextSeq, rep *Repeat, c chan MRespPair, wg *sync.WaitGroup) {
+func (rg *RepeatGenome) sendMins(seq []byte, rep *Repeat, c chan MRespPair, wg *sync.WaitGroup) {
     defer wg.Done()
-    var numMins = len(seq) - int(m) + 1
+    var numMins = len(seq) - bioutils.M + 1
 MinLoop:
     for i := 0; i < numMins; i++ {
-        for j := int(m) + i - 1; j >= i; j-- {
+        for j := bioutils.M + i - 1; j >= i; j-- {
             if seq[j] == byte('n') {
                 i += j - i
                 continue MinLoop
             }
         }
-        minInt := seq[i:i+int(m)].minInt()
+        minInt := bioutils.BytesToU32(seq[i:i+bioutils.M])
         c <- MRespPair{minInt, rep}
-        c <- MRespPair{minInt.revComp(), rep}
+        c <- MRespPair{bioutils.RevComp32(minInt), rep}
     }
 }
 
 
-func (rg *RepeatGenome) GetKmerMap() (int, int, map[KmerInt]*Repeat) {
+func (rg *RepeatGenome) GetKmerMap() (int, int, map[uint64]*Repeat) {
     repChan, nonrepChan := rg.SplitChromsK()
     nonreps, reps := 0, 0
-    repMap := make(map[KmerInt]*Repeat, 300000000)
+    repMap := make(map[uint64]*Repeat, 300000000)
     wg := new(sync.WaitGroup)
     wg.Add(2)
     go func() {
@@ -201,10 +202,10 @@ func (rg *RepeatGenome) GetKmerMap() (int, int, map[KmerInt]*Repeat) {
 }
 
 
-func (rg *RepeatGenome) GetMinMap() (int, int, map[MinInt]*Repeat) {
+func (rg *RepeatGenome) GetMinMap() (int, int, map[uint32]*Repeat) {
     repChan, nonrepChan := rg.SplitChromsM()
     nonreps, reps := 0, 0
-    repMap := make(map[MinInt]*Repeat, 300000000)
+    repMap := make(map[uint32]*Repeat, 300000000)
     wg := new(sync.WaitGroup)
     wg.Add(2)
     go func() {
@@ -235,21 +236,21 @@ func (rg *RepeatGenome) GetMinMap() (int, int, map[MinInt]*Repeat) {
 
 
 /*
-func (rg *RepeatGenome) KmerClassifyRead(read TextSeq, kmerMap map[KmerInt]*Repeat, wg *sync.WaitGroup, c chan *Repeat) {
+func (rg *RepeatGenome) KmerClassifyRead(read []byte, kmerMap map[uint64]*Repeat, wg *sync.WaitGroup, c chan *Repeat) {
     defer wg.Done()
     // the repeat we assign this read
     // nil if we don't find one
     var repeat *Repeat
-    var numKmers = len(read) - int(m) + 1
+    var numKmers = len(read) - bioutils.M + 1
 KmerLoop:
     for i := 0; i < numKmers; i++ {
-        for j := int(m) + i - 1; j >= i; j-- {
+        for j := bioutils.M + i - 1; j >= i; j-- {
             if read[j] == byte('n') {
                 i += j - i
                 continue KmerLoop
             }
         }
-        kmerInt := read[i:i+int(m)].kmerInt()
+        kmerInt := bioutils.BytesToU64(read[i:i+bioutils.M])
         
         if kmerRepeat, exists := kmerMap[kmerInt]; exists {
             if repeat == nil {
@@ -269,21 +270,21 @@ KmerLoop:
 
 
 /*
-func (rg *RepeatGenome) MinClassifyRead(read TextSeq, minMap map[MinInt]*Repeat, wg *sync.WaitGroup, c chan *Repeat) {
+func (rg *RepeatGenome) MinClassifyRead(read []byte, minMap map[uint32]*Repeat, wg *sync.WaitGroup, c chan *Repeat) {
     defer wg.Done()
     // the repeat we assign this read
     // nil if we don't find one
     var repeat *Repeat
-    var numMins = len(read) - int(m) + 1
+    var numMins = len(read) - bioutils.M + 1
 MinLoop:
     for i := 0; i < numMins; i++ {
-        for j := int(m) + i - 1; j >= i; j-- {
+        for j := bioutils.M + i - 1; j >= i; j-- {
             if read[j] == byte('n') {
                 i += j - i
                 continue MinLoop
             }
         }
-        minInt := read[i:i+int(m)].minInt()
+        minInt := bioutils.BytesToU32(read[i:i+bioutils.M])
         if minRepeat, exists := minMap[minInt]; exists {
             if repeat == nil {
                 repeat = minRepeat
@@ -306,22 +307,22 @@ type ReadSAMRepeat struct {
 }
 
 
-func (rg *RepeatGenome) MinClassifyRead(readSAM ReadSAM, minMap map[MinInt]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
+func (rg *RepeatGenome) MinClassifyRead(readSAM ReadSAM, minMap map[uint32]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
     defer wg.Done()
     read := readSAM.TextSeq
     // the repeat we assign this read
     // nil if we don't find one
     var repeat *Repeat
-    var numMins = len(read) - int(m) + 1
+    var numMins = len(read) - bioutils.M + 1
 MinLoop:
     for i := 0; i < numMins; i++ {
-        for j := int(m) + i - 1; j >= i; j-- {
+        for j := bioutils.M + i - 1; j >= i; j-- {
             if read[j] == byte('n') {
                 i += j - i
                 continue MinLoop
             }
         }
-        minInt := read[i:i+int(m)].minInt()
+        minInt := bioutils.BytesToU32(read[i:i+bioutils.M])
         if minRepeat, exists := minMap[minInt]; exists {
             if repeat == nil {
                 repeat = minRepeat
@@ -337,22 +338,22 @@ MinLoop:
 }
 
 
-func (rg *RepeatGenome) KmerClassifyRead(readSAM ReadSAM, kmerMap map[KmerInt]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
+func (rg *RepeatGenome) KmerClassifyRead(readSAM ReadSAM, kmerMap map[uint64]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
     defer wg.Done()
     read := readSAM.TextSeq
     // the repeat we assign this read
     // nil if we don't find one
     var repeat *Repeat
-    var numKmers = len(read) - int(k) + 1
+    var numKmers = len(read) - bioutils.K + 1
 KmerLoop:
     for i := 0; i < numKmers; i++ {
-        for j := int(k) + i - 1; j >= i; j-- {
+        for j := bioutils.K + i - 1; j >= i; j-- {
             if read[j] == byte('n') {
                 i += j - i
                 continue KmerLoop
             }
         }
-        kmerInt := read[i:i+int(k)].kmerInt()
+        kmerInt := bioutils.BytesToU64(read[i:i+bioutils.K])
         if kmerRepeat, exists := kmerMap[kmerInt]; exists {
             if repeat == nil {
                 repeat = kmerRepeat
@@ -368,7 +369,7 @@ KmerLoop:
 }
 
 
-func (rg *RepeatGenome) MinClassifyReadVerb(readSAM ReadSAM, minMap map[MinInt]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
+func (rg *RepeatGenome) MinClassifyReadVerb(readSAM ReadSAM, minMap map[uint32]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
     defer wg.Done()
     read := readSAM.TextSeq
     fmt.Println(read)
@@ -376,36 +377,35 @@ func (rg *RepeatGenome) MinClassifyReadVerb(readSAM ReadSAM, minMap map[MinInt]*
     // the repeat we assign this read
     // nil if we don't find one
     var repeat *Repeat
-    var numMins = len(read) - int(m) + 1
+    var numMins = len(read) - bioutils.M + 1
 MinLoop:
     for i := 0; i < numMins; i++ {
-        for j := int(m) + i - 1; j >= i; j-- {
+        for j := bioutils.M + i - 1; j >= i; j-- {
             if read[j] == byte('n') {
                 i += j - i
                 continue MinLoop
             }
         }
-        minInt := read[i:i+int(m)].minInt()
+        minInt := bioutils.BytesToU32(read[i:i+bioutils.M])
         if minRepeat, exists := minMap[minInt]; exists {
             if repeat == nil {
                 repeat = minRepeat
                 fmt.Println("recognized:")
-                fmt.Print("\t"); minInt.print(); fmt.Println()
+                fmt.Printf("\t%s\n", string(bioutils.U32ToBytes(minInt)))
                 fmt.Printf("\t\t%s\n", repeat.Name)
             // minRepeat is assumed to not be nil
             // nils in minMap must therefore be deleted
             } else if repeat != minRepeat {
                 fmt.Println("conflict:")
-                fmt.Print("\t"); minInt.print(); fmt.Println()
+                fmt.Printf("\t%s\n", string(bioutils.U32ToBytes(minInt)))
                 fmt.Printf("\t\t%s\n", repeat.Name)
                 repeat = nil
                 fmt.Println("BREAK")
                 break
             }
         } else {
-            fmt.Print("\tunrecognized: ")
-            minInt.print()
-            fmt.Println()
+            fmt.Printf("\tunrecognized: %s\n",
+                string(bioutils.U32ToBytes(minInt)))
         }
     }
     rsr :=  ReadSAMRepeat{readSAM, repeat}
@@ -422,7 +422,7 @@ MinLoop:
 }
 
 
-func (rg *RepeatGenome) KmerClassifyReadVerb(readSAM ReadSAM, kmerMap map[KmerInt]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
+func (rg *RepeatGenome) KmerClassifyReadVerb(readSAM ReadSAM, kmerMap map[uint64]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
     defer wg.Done()
     read := readSAM.TextSeq
     fmt.Println(read)
@@ -430,36 +430,35 @@ func (rg *RepeatGenome) KmerClassifyReadVerb(readSAM ReadSAM, kmerMap map[KmerIn
     // the repeat we assign this read
     // nil if we don't find one
     var repeat *Repeat
-    var numMins = len(read) - int(k) + 1
+    var numMins = len(read) - bioutils.K + 1
 MinLoop:
     for i := 0; i < numMins; i++ {
-        for j := int(k) + i - 1; j >= i; j-- {
+        for j := bioutils.K + i - 1; j >= i; j-- {
             if read[j] == byte('n') {
                 i += j - i
                 continue MinLoop
             }
         }
-        kmerInt := read[i:i+int(k)].kmerInt()
+        kmerInt := bioutils.BytesToU64(read[i:i+bioutils.K])
         if kmerRepeat, exists := kmerMap[kmerInt]; exists {
             if repeat == nil {
                 repeat = kmerRepeat
                 fmt.Println("recognized:")
-                fmt.Print("\t"); kmerInt.print(); fmt.Println()
+                fmt.Printf("\t%s\n", string(bioutils.U64ToBytes(kmerInt)))
                 fmt.Printf("\t\t%s\n", repeat.Name)
             // kmerRepeat is assumed to not be nil
             // nils in kmerMap must therefore be deleted
             } else if repeat != kmerRepeat {
                 fmt.Println("conflict:")
-                fmt.Print("\t"); kmerInt.print(); fmt.Println()
+                fmt.Printf("\t%s\n", string(bioutils.U64ToBytes(kmerInt)))
                 fmt.Printf("\t\t%s\n", repeat.Name)
                 repeat = nil
                 fmt.Println("BREAK")
                 break
             }
         } else {
-            fmt.Print("\tunrecognized: ")
-            kmerInt.print()
-            fmt.Println()
+            fmt.Printf("\tunrecognized: %s\n",
+                string(bioutils.U64ToBytes(kmerInt)))
         }
     }
     rsr :=  ReadSAMRepeat{readSAM, repeat}

@@ -75,12 +75,12 @@ func (rg *RepeatGenome) RunDebugTests() {
 
     thisKmer := bioutils.BytesToU64([]byte("atgtttgtgtttttcataaagacgaaagatg"))
     thisMin := bioutils.Minimize(thisKmer)
-    fmt.Printf("minimizer of 'tgctcctgtcatgcatacgcaggtcatgcat': %s\n", string(MinToBytes(thisMin)))
+    fmt.Printf("minimizer of 'tgctcctgtcatgcatacgcaggtcatgcat': %s\n", string(bioutils.U32ToBytes(thisMin)))
     fmt.Println()
 
     fmt.Print("revComp of %s: %d\n",
-        string(KmerToBytes(thisKmer)),
-        string(KmerToBytes(bioutils.RevComp64(thisKmer))))
+        string(bioutils.U64ToBytes(thisKmer)),
+        string(bioutils.U64ToBytes(bioutils.RevComp64(thisKmer))))
     fmt.Printf("Kmer struct size: %d\n", unsafe.Sizeof(Kmer{}))
     fmt.Println()
 
@@ -171,7 +171,7 @@ func (rg *RepeatGenome) checkIntegrity() {
         lca := rg.getKmerLCA(kmer.Int())
         if lca == nil {
             fmt.Printf("ERROR: kmer %d not found by rg.getKmer()\n",
-                string(KmerToBytes(kmer.Int())))
+                string(bioutils.U64ToBytes(kmer.Int())))
             os.Exit(1)
         }
     }

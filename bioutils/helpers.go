@@ -48,6 +48,14 @@ func minU64(a, b uint64) uint64 {
     }
 }
 
+func maxF64 (a, b float64) float64 {
+    if a > b {
+        return a
+    } else {
+        return b
+    }
+}
+
 func ceilDiv_U64(a, b uint64) uint64 {
     if a == 0 {
         return 0

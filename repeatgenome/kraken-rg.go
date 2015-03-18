@@ -61,30 +61,29 @@ func (rg *RepeatGenome) getKmerLCA(kmerInt uint64) *ClassNode {
    Pushes all minimizers of all kmers of each Match in the supplied slice to the supplied chan.
 */
 func (rg *RepeatGenome) getRawMins(matchChan chan *bioutils.Match, respChan chan uint32, wg *sync.WaitGroup) {
-    k_ := uint64(k)
     for match := range matchChan {
         start, end := match.SeqStart, match.SeqEnd
         matchSeq := rg.chroms[match.SeqName][match.SeqName][start:end]
 
-        if len(matchSeq) < int(k) {
+        if len(matchSeq) < bioutils.K {
             continue
         }
         // includes kmers containing n's, which are ignored
-        numKmers := end - start - k_ + 1
+        numKmers := end - start - bioutils.K + 1
 
         var i uint64
     KmerLoop:
         for i = 0; i < numKmers; i++ {
 
             var j int64
-            for j = int64(k_) - 1; j >= 0; j-- {
+            for j = bioutils.K - 1; j >= 0; j-- {
                 if matchSeq[i+uint64(j)] == 'n' {
                     i += uint64(j)
                     continue KmerLoop
                 }
             }
 
-            seq := matchSeq[i : i+k_]
+            seq := matchSeq[i : i+bioutils.K]
             kmerInt := bioutils.BytesToU64(seq)
             respChan <- bioutils.Minimize(kmerInt)
         }
@@ -110,30 +109,29 @@ type ResponsePair struct {
    of the match processed, not the Kmer's final LCA ID.
 */
 func (rg *RepeatGenome) getMatchKmers(matchChan chan *bioutils.Match, respChan chan ResponsePair, wg *sync.WaitGroup) {
-    k_ := uint64(k)
     for match := range matchChan {
         start, end := match.SeqStart, match.SeqEnd
         matchSeq := rg.chroms[match.SeqName][match.SeqName][start:end]
 
-        if len(matchSeq) < int(k) {
+        if len(matchSeq) < bioutils.K {
             continue
         }
         // includes kmers containing n's, which are ignored
-        numRawKmers := end - start - k_ + 1
+        numRawKmers := end - start - bioutils.K + 1
 
         var i uint64
     KmerLoop:
         for i = 0; i < numRawKmers; i++ {
 
             var j int64
-            for j = int64(k_) - 1; j >= 0; j-- {
+            for j = int64(bioutils.K) - 1; j >= 0; j-- {
                 if matchSeq[i+uint64(j)] == 'n' {
                     i += uint64(j)
                     continue KmerLoop
                 }
             }
 
-            seq := matchSeq[i : i+k_]
+            seq := matchSeq[i : i+bioutils.K]
             rawInt := bioutils.BytesToU64(seq)
             kmerInt := bioutils.CanonicalRepr64(rawInt)
             var kmer Kmer

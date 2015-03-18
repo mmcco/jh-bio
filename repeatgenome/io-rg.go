@@ -10,6 +10,7 @@ import (
     "encoding/binary"
     "encoding/json"
     "fmt"
+    "github.com/plsql/jh-bio/bioutils"
     "io"
     "os"
     "strconv"
@@ -160,122 +161,6 @@ func (rg *RepeatGenome) WriteMins() error {
 }
 */
 
-func KmerToBytes(kmerInt uint64) []byte {
-    b := make([]byte, k)
-    var i uint8
-    for i = 0; i < k; i++ {
-        // this tricky bit arithmetic shifts the two bits of interests
-        // to the two rightmost positions, then selects them with the
-        // and statement
-        switch (kmerInt >> (2 * (k - i - 1))) & 3 {
-        case 0:
-            b = append(b, 'a')
-            break
-        case 1:
-            b = append(b, 'c')
-            break
-        case 2:
-            b = append(b, 'g')
-            break
-        case 3:
-            b = append(b, 't')
-            break
-        default:
-            panic("error in printSeqInt() base selection")
-        }
-    }
-
-    return b
-}
-
-func MinToBytes(minInt uint32) []byte {
-    b := make([]byte, k)
-    var i uint8
-    for i = 0; i < m; i++ {
-        // this tricky bit arithmetic shifts the two bits of interests
-        // to the two rightmost positions, then selects them with the
-        // and statement
-        switch (minInt >> (2 * (m - i - 1))) & 3 {
-        case 0:
-            b = append(b, 'a')
-            break
-        case 1:
-            b = append(b, 'c')
-            break
-        case 2:
-            b = append(b, 'g')
-            break
-        case 3:
-            b = append(b, 't')
-            break
-        default:
-            panic("error in printSeqInt() base selection")
-        }
-    }
-
-    return b
-}
-
-func writeKmerInt(writer io.ByteWriter, seqInt uint64) error {
-    var i uint8
-    var err error
-    for i = 0; i < k; i++ {
-        // this tricky bit arithmetic shifts the two bits of interests
-        // to the two rightmost positions, then selects them with the
-        // and statement
-        switch (seqInt >> (2 * (k - i - 1))) & 3 {
-        case 0:
-            err = writer.WriteByte('a')
-            break
-        case 1:
-            err = writer.WriteByte('c')
-            break
-        case 2:
-            err = writer.WriteByte('g')
-            break
-        case 3:
-            err = writer.WriteByte('t')
-            break
-        default:
-            err = fmt.Errorf("error in printSeqInt() base selection")
-        }
-        if err != nil {
-            return fmt.Errorf("repeatgenome.writeSeqInt():" + err.Error())
-        }
-    }
-    return nil
-}
-
-func writeMinInt(writer io.ByteWriter, seqInt uint32) error {
-    var i uint8
-    var err error
-    for i = 0; i < m; i++ {
-        // this tricky bit arithmetic shifts the two bits of interests
-        // to the two rightmost positions, then selects them with the
-        // and statement
-        switch (seqInt >> (2 * (m - i - 1))) & 3 {
-        case 0:
-            err = writer.WriteByte('a')
-            break
-        case 1:
-            err = writer.WriteByte('c')
-            break
-        case 2:
-            err = writer.WriteByte('g')
-            break
-        case 3:
-            err = writer.WriteByte('t')
-            break
-        default:
-            err = fmt.Errorf("error in printSeqInt() base selection")
-        }
-        if err != nil {
-            return fmt.Errorf("repeatgenome.writeSeqInt():" + err.Error())
-        }
-    }
-    return nil
-}
-
 // assumes that all bytes in the slice to be filled are initialized
 // (a.k.a initialize buffer with make([]byte, k, k))
 func fillKmerBuf(slice []byte, seqInt uint64) {
@@ -411,7 +296,15 @@ func (rg *RepeatGenome) WriteKraken() error {
     defer outfile.Close()
 
     // write magic bytes, k, m, numMins, and numKmers
-    for _, val := range []interface{}{magicVal, int(k), int(m), len(rg.SortedMins), len(rg.Kmers)} {
+    write_vals := []interface{}{
+        magicVal,
+        int(bioutils.K),
+        int(bioutils.M),
+        len(rg.SortedMins),
+        len(rg.Kmers),
+    }
+
+    for _, val := range write_vals {
         numBytes := binary.PutUvarint(buf, uint64(val.(int)))
         bytesWritten, err := outfile.Write(buf[:numBytes])
         if bytesWritten != numBytes {
@@ -482,7 +375,7 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
     if err != nil {
         return fmt.Errorf("RepeatGenome.ReadKraken():" + err.Error())
     }
-    if uint8(thisK) != k {
+    if uint8(thisK) != bioutils.K {
         return fmt.Errorf("RepeatGenome.ReadKraken(): incompatible k value - are you sure" + infile.Name() + "is the right file?")
     }
 
@@ -491,7 +384,7 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
     if err != nil {
         return fmt.Errorf("RepeatGenome.ReadKraken():" + err.Error())
     }
-    if uint8(thisM) != m {
+    if uint8(thisM) != bioutils.M {
         return fmt.Errorf("RepeatGenome.ReadKraken(): incompatible m value - are you sure" + infile.Name() + "is the right file?")
     }
 
@@ -608,7 +501,7 @@ func readSimSeqReads(filepath string) (error, Seqs) {
 }
 
 type ReadSAM struct {
-    TextSeq TextSeq
+    TextSeq []byte
     SeqName  string
     StartInd uint64
 }

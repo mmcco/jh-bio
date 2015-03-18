@@ -31,21 +31,20 @@ func (rg *RepeatGenome) QuickClassifyReads(readTextSeqs [][]byte, responseChan c
 ReadLoop:
     for _, read := range readTextSeqs {
         // signed integers prevent underflow in down-counting for loops
-        k_ := int64(k)
-        numKmers := int64(len(read)) - k_ + 1
+        numKmers := int64(len(read)) - bioutils.K + 1
 
         var i int64
     KmerLoop:
         for i = 0; i < numKmers; i++ {
 
-            for j := k_ + i - 1; j >= i; j-- {
+            for j := bioutils.K + i - 1; j >= i; j-- {
                 if read[j] == byte('n') {
                     i += j - i
                     continue KmerLoop
                 }
             }
 
-            kBytes := read[i : i+k_]
+            kBytes := read[i : i+bioutils.K]
             rawInt := bioutils.BytesToU64(kBytes)
             kmerInt := bioutils.CanonicalRepr64(rawInt)
             kmerLCA := rg.getKmerLCA(kmerInt)
@@ -71,22 +70,21 @@ ReadLoop:
 func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs [][]byte, responseChan chan ReadResponse) {
     for _, read := range readTextSeqs {
         // signed integers prevent underflow in down-counting for loops
-        k_ := int64(k)
-        numKmers := int64(len(read)) - k_ + 1
+        numKmers := int64(len(read)) - bioutils.K + 1
 
         var class *ClassNode = nil
         var i int64
     KmerLoop:
         for i = 0; i < numKmers; i++ {
 
-            for j := k_ + i - 1; j >= i; j-- {
+            for j := bioutils.K + i - 1; j >= i; j-- {
                 if read[j] == byte('n') {
                     i += j - i
                     continue KmerLoop
                 }
             }
 
-            kBytes := read[i : i+k_]
+            kBytes := read[i : i+bioutils.K]
             rawInt := bioutils.BytesToU64(kBytes)
             kmerInt := bioutils.CanonicalRepr64(rawInt)
             kmerLCA := rg.getKmerLCA(kmerInt)
@@ -197,7 +195,7 @@ func (rg *RepeatGenome) GetProcReads() (error, [][]byte) {
 /*
 
 */
-func (rg *RepeatGenome) GetReads() (error, []TextSeq) {
+func (rg *RepeatGenome) GetReads() (error, [][]byte) {
     workingDirName, err := os.Getwd()
     if err != nil {
         return err, nil

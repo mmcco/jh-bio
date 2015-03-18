@@ -33,7 +33,7 @@ func fileLines(filepath string) (err error, linesBytes [][]byte) {
     }
 }
 
-// Courtesy of https://github.com/dustin/go-humanize
+// Derived from https://github.com/dustin/go-humanize
 // Returns a string representing the int, with commas for readability.
 func comma(v uint64) string {
     sign := ""
@@ -68,8 +68,6 @@ func main() {
     }
     genomeName := os.Args[len(os.Args)-1]
 
-    k_arg := flag.Uint("k", 31, "kmer length")
-    m_arg := flag.Uint("m", 15, "minimizer length")
     forceGen := flag.Bool("force_gen", false, "force Kraken database generation, regardless of whether it already exists in stored form")
     writeStats := flag.Bool("write_stats", false, "write various tab-delimited and JSON files representing peripheral Kraken and repeat data")
     dontWriteLib := flag.Bool("no_write_lib", false, "don't write the Kraken library to file")
@@ -91,18 +89,8 @@ func main() {
         defer pprof.StopCPUProfile()
     }
 
-    var k, m uint8
-    if *k_arg > 255 || *m_arg > 255 {
-        panic("k and m must be >= 255")
-    } else {
-        k = uint8(*k_arg)
-        m = uint8(*m_arg)
-    }
-
     err, rg := repeatgenome.New(repeatgenome.Config{
         Name:       genomeName,
-        K:          k,
-        M:          m,
         Debug:      *debug,
         CPUProfile: *cpuProfile,
         MemProfile: *memProfile,
@@ -156,28 +144,6 @@ func main() {
         }
     }
 
-    /*  deprecated by changed functions - should eventually find another way of making this check
-        if numReads != uint64(len(readsBytes)) {
-            panic("not all reads, or too many reads, returned from RepeatGenome.GetReadClassChan()")
-        }
-    */
-
-    /*
-       if rg.Flags.Debug {
-           classCount := make(map[*repeatgenome.ClassNode]uint64)
-           err, respChan = rg.ProcessReads()
-           for response := range respChan {
-               if response.ClassNode != nil {
-                   classCount[response.ClassNode]++
-               }
-           }
-
-           for classNode, count := range classCount {
-               fmt.Printf("%s\t%d\n", classNode.Name, count)
-           }
-       }
-    */
-
     var nonRootResps []repeatgenome.ReadResponse
     for _, resp := range responses {
         if resp.ClassNode != nil && resp.ClassNode.Name != "root" {
@@ -185,18 +151,28 @@ func main() {
         }
     }
 
-    fmt.Printf("RepeatGenome.Kmers comprises %.2f GB\n", rg.KmersGBSize())
-    fmt.Println()
+    fmt.Printf("RepeatGenome.Kmers comprises %.2f GB\n\n",
+        rg.KmersGBSize())
 
-    fmt.Printf("%.2f million reads processed per minute\n", (float64(numReads)/1000000)/netTime.Minutes())
-    fmt.Printf("%.2f%% of the genome consists of repeat sequences\n", rg.PercentRepeats())
-    fmt.Printf("%.2f%% of reads were classified with a repeat sequence (%s of %s)\n", 100*(float64(numClassifiedReads)/float64(numReads)), comma(numClassifiedReads), comma(numReads))
-    fmt.Printf("%.2f%% of classified reads were classified at the class tree root (%s reads)\n", 100*(float64(rootReads)/float64(numReads)), comma(rootReads))
-    fmt.Printf("on average, a classification restricted a read's possible location to %.2f%% of the genome\n", rg.AvgPossPercentGenome(responses, true))
-    fmt.Printf("on average, a non-root classification restricted a read's possible location to %.2f%% of the genome\n", rg.AvgPossPercentGenome(nonRootResps, true))
-    fmt.Printf("on average, a classification restricted a read's possible location to %.2f%% of the genome (non-strict)\n", rg.AvgPossPercentGenome(responses, false))
-    fmt.Printf("on average, a non-root classification restricted a read's possible location to %.2f%% of the genome (non-strict)\n", rg.AvgPossPercentGenome(nonRootResps, false))
-    fmt.Println()
+    fmt.Printf("%.2f million reads processed per minute\n",
+        (float64(numReads)/1000000)/netTime.Minutes())
+    fmt.Printf("%.2f%% of the genome consists of repeat sequences\n",
+        rg.PercentRepeats())
+    fmt.Printf("%.2f%% of reads were classified with a repeat sequence (%s of %s)\n",
+        100*(float64(numClassifiedReads)/float64(numReads)),
+        comma(numClassifiedReads),
+        comma(numReads))
+    fmt.Printf("%.2f%% of classified reads were classified at the class tree root (%s reads)\n",
+        100*(float64(rootReads)/float64(numReads)),
+        comma(rootReads))
+    fmt.Printf("on average, a classification restricted a read's possible location to %.2f%% of the genome\n",
+        rg.AvgPossPercentGenome(responses, true))
+    fmt.Printf("on average, a non-root classification restricted a read's possible location to %.2f%% of the genome\n",
+        rg.AvgPossPercentGenome(nonRootResps, true))
+    fmt.Printf("on average, a classification restricted a read's possible location to %.2f%% of the genome (non-strict)\n",
+        rg.AvgPossPercentGenome(responses, false))
+    fmt.Printf("on average, a non-root classification restricted a read's possible location to %.2f%% of the genome (non-strict)\n\n",
+        rg.AvgPossPercentGenome(nonRootResps, false))
 
     if *verifyClass {
         fmt.Println("...using SAM-formatted reads to check classification correctness...")
@@ -228,8 +204,10 @@ func main() {
 
         fmt.Println("parsed", len(readSAMResps), "ReadSAMResponses")
 
-        fmt.Printf("%.2f%% of classified reads overlapped an instance of their assigned repeat class\n", rg.PercentTrueClassifications(readSAMResps, false))
-        fmt.Printf("%.2f%% of classified reads overlapped an instance of their assigned repeat class (strict)\n\n", rg.PercentTrueClassifications(readSAMResps, true))
+        fmt.Printf("%.2f%% of classified reads overlapped an instance of their assigned repeat class\n",
+            rg.PercentTrueClassifications(readSAMResps, false))
+        fmt.Printf("%.2f%% of classified reads overlapped an instance of their assigned repeat class (strict)\n\n",
+            rg.PercentTrueClassifications(readSAMResps, true))
     }
 }
 

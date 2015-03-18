@@ -48,9 +48,9 @@ func NeedlemanWunsch(a, b []byte) float64 {
             cost := getCost(a, i-1, b, j-1)
 
 			// find the lowest cost
-			d[i][j] = max(
+			d[i][j] = maxF64(
 				d[i-1][j]-GAP_COST,
-				max(d[i][j-1]-GAP_COST, d[i-1][j-1]+cost))
+				maxF64(d[i][j-1]-GAP_COST, d[i-1][j-1]+cost))
 		}
 	}
 
@@ -82,9 +82,9 @@ func SmithWaterman(a, b []byte) float64 {
             cost := getCost(a, i-1, b, j-1)
 
 			// find the lowest cost
-			d[i][j] = max(
-				max(0, d[i-1][j]-GAP_COST),
-				max(d[i][j-1]-GAP_COST, d[i-1][j-1]+cost))
+			d[i][j] = maxF64(
+				maxF64(0, d[i-1][j]-GAP_COST),
+				maxF64(d[i][j-1]-GAP_COST, d[i-1][j-1]+cost))
 
 			// save if it is the biggest thus far
 			if d[i][j] > maxSoFar {

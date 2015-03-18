@@ -6,6 +6,7 @@ package repeatgenome
 
 import (
     "bytes"
+    "github.com/plsql/jh-bio/bioutils"
     "unsafe"
 )
 
@@ -95,7 +96,7 @@ func (readResp ReadResponse) HangingSize() uint64 {
     if classNode.Repeat != nil {
         for _, match := range classNode.Repeat.Instances {
             classNodeSize += match.SeqEnd - match.SeqStart
-            classNodeSize += 2 * uint64(len(readResp.Seq)-int(k))
+            classNodeSize += 2 * uint64(len(readResp.Seq)-bioutils.K)
         }
     }
 
@@ -156,7 +157,7 @@ func (rg *RepeatGenome) recNodeSearch(classNode *ClassNode, readSAM ReadSAM, str
                 if readSAM.StartInd > match.SeqStart {
                     overlap -= readSAM.StartInd - match.SeqStart
                 }
-                if overlap >= uint64(k) {
+                if overlap >= bioutils.K {
                     return true
                 }
             }
@@ -198,7 +199,7 @@ func (rg *RepeatGenome) RepeatIsCorrect(readSAMRepeat ReadSAMRepeat, strict bool
             if startInd > match.SeqStart {
                 overlap -= startInd - match.SeqStart
             }
-            if overlap >= uint64(k) {
+            if overlap >= bioutils.K {
                 return true
             }
         }
@@ -275,7 +276,6 @@ func (rg *RepeatGenome) PercentTrueClassifications(responses []ReadSAMResponse, 
    This is different from the count returned by krakenFirstPass() because it does not allow ambiguous kmers.
 */
 func (rg *RepeatGenome) numRawKmers() uint64 {
-    var k_ = int(k)
     var numRawKmers uint64 = 0
 
     splitOnN := func(c rune) bool { return c == 'n' }
@@ -285,8 +285,8 @@ func (rg *RepeatGenome) numRawKmers() uint64 {
         seq := rg.chroms[match.SeqName][match.SeqName][match.SeqStart:match.SeqEnd]
         seqs := bytes.FieldsFunc([]byte(seq), splitOnN)
         for j := range seqs {
-            if len(seqs[j]) >= k_ {
-                numRawKmers += uint64(len(seqs[j]) - k_ + 1)
+            if len(seqs[j]) >= bioutils.K {
+                numRawKmers += uint64(len(seqs[j]) - bioutils.K + 1)
             }
         }
     }
