@@ -33,8 +33,8 @@ func (classTree *ClassTree) getLCA(cnA, cnB *ClassNode) *ClassNode {
    Finds the ClassNode associated with a Kmer in the Kraken library.
    Part of the core Kraken read-classification functionality.
 */
-func (rg *RepeatGenome) getKmerLCA(kmerInt KmerInt) *ClassNode {
-    minimizer := kmerInt.Minimize()
+func (rg *RepeatGenome) getKmerLCA(kmerInt uint64) *ClassNode {
+    minimizer := bioutils.Minimize(kmerInt)
 
     // simple binary search within the range of RepeatGenome.Kmers that has this kmer's minimizer
     i := rg.MinOffsets[minimizer]
@@ -60,7 +60,7 @@ func (rg *RepeatGenome) getKmerLCA(kmerInt KmerInt) *ClassNode {
 /*
    Pushes all minimizers of all kmers of each Match in the supplied slice to the supplied chan.
 */
-func (rg *RepeatGenome) getRawMins(matchChan chan *bioutils.Match, respChan chan MinInt, wg *sync.WaitGroup) {
+func (rg *RepeatGenome) getRawMins(matchChan chan *bioutils.Match, respChan chan uint32, wg *sync.WaitGroup) {
     k_ := uint64(k)
     for match := range matchChan {
         start, end := match.SeqStart, match.SeqEnd
@@ -84,7 +84,9 @@ func (rg *RepeatGenome) getRawMins(matchChan chan *bioutils.Match, respChan chan
                 }
             }
 
-            respChan <- TextSeq(matchSeq[i : i+k_]).kmerInt().Minimize()
+            seq := matchSeq[i : i+k_]
+            kmerInt := bioutils.BytesToU64(seq)
+            respChan <- bioutils.Minimize(kmerInt)
         }
     }
     wg.Done()
@@ -98,7 +100,7 @@ func (rg *RepeatGenome) getRawMins(matchChan chan *bioutils.Match, respChan chan
 */
 type ResponsePair struct {
     Kmer   Kmer
-    MinInt MinInt
+    MinInt uint32
 }
 
 /*
@@ -131,11 +133,13 @@ func (rg *RepeatGenome) getMatchKmers(matchChan chan *bioutils.Match, respChan c
                 }
             }
 
-            kmerInt := TextSeq(matchSeq[i : i+k_]).kmerInt().canonicalRepr()
+            seq := matchSeq[i : i+k_]
+            rawInt := bioutils.BytesToU64(seq)
+            kmerInt := bioutils.CanonicalRepr64(rawInt)
             var kmer Kmer
             (&kmer).SetInt(kmerInt)
             (&kmer).SetClassID(rg.matchNodes[match].ID)
-            respChan <- ResponsePair{kmer, kmerInt.Minimize()}
+            respChan <- ResponsePair{kmer, bioutils.Minimize(kmerInt)}
         }
     }
     wg.Done()
@@ -160,7 +164,7 @@ func (rg *RepeatGenome) krakenFirstPass() (numRawKmers uint64, numRawMins uint64
 
     wg := new(sync.WaitGroup)
     wg.Add(numCPU)
-    respChan := make(chan MinInt) // cannot buffer without additional WaitGroup
+    respChan := make(chan uint32) // cannot buffer without additional WaitGroup
 
     go func() {
         wg.Wait()
@@ -223,8 +227,8 @@ func (rg *RepeatGenome) sortRawKmers(rawKmers Kmers, rawMinCounts []uint32) {
     wg.Wait()
 }
 
-func (rg *RepeatGenome) genSimpleMap() map[KmerInt]ClassID {
-    kmerClasses := make(map[KmerInt]ClassID)
+func (rg *RepeatGenome) genSimpleMap() map[uint64]ClassID {
+    kmerClasses := make(map[uint64]ClassID)
     for respPair := range rg.respPairChan() {
         kmerInt, classID := respPair.Kmer.Int(), respPair.Kmer.ClassID()
         prevClassID, exists := kmerClasses[kmerInt]
@@ -388,7 +392,7 @@ func (rg *RepeatGenome) genKrakenLib() {
     rg.SortedMins = make(MinInts, 0, numRawMins)
     for minInt, cnt := range rawMinCounts {
         if cnt > 0 {
-            rg.SortedMins = append(rg.SortedMins, MinInt(minInt))
+            rg.SortedMins = append(rg.SortedMins, uint32(minInt))
         }
     }
     fmt.Println("RepeatGenome.SortedMins generated")
@@ -425,7 +429,8 @@ func (rg *RepeatGenome) genKrakenLib() {
     fmt.Println("generating RepeatGenome.MinCounts")
     rg.MinCounts = make([]uint32, minSliceSize, minSliceSize)
     for _, kmer := range rg.Kmers {
-        rg.MinCounts[kmer.Int().Minimize()]++
+        min := bioutils.Minimize(kmer.Int())
+        rg.MinCounts[min]++
     }
     fmt.Println("RepeatGenome.MinCounts generated")
 

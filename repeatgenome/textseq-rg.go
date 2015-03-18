@@ -9,15 +9,16 @@ package repeatgenome
 /*
    A representation of a genetic sequence using one byte letter per base.
    A type synonym is used to differentiate one-byte-per-base sequences from two-bits-per-base sequences (type Seq), which also use the concrete type []byte.
+
+   This type synonym has been removed in favor of the base type.
 */
-type TextSeq []byte
 
 /*
    Returns the reverse complement of the supplied TextSeq.
    This drains memory and should therefore not be used outside of debugging and printing.
 */
-func (seq TextSeq) revComp() TextSeq {
-    var revCompSeq = make(TextSeq, 0, len(seq))
+func TSRevComp(seq []byte) []byte {
+    var revCompSeq = make([]byte, 0, len(seq))
 
     for i := range seq {
         switch seq[len(seq)-i-1] {
@@ -43,7 +44,7 @@ func (seq TextSeq) revComp() TextSeq {
 /*
    Returns a bool describing whether the first TextSeq is lexicographically smaller than the second.
 */
-func Less(a, b TextSeq) bool {
+func Less(a, b []byte) bool {
     size := min(len(a), len(b))
 
     for i := 0; i < size; i++ {

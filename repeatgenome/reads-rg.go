@@ -7,6 +7,7 @@ package repeatgenome
 import (
     "bytes"
     "fmt"
+    "github.com/plsql/jh-bio/bioutils"
     "os"
     "sync"
 )
@@ -15,18 +16,18 @@ import (
    The type sent back from read-classifying goroutines of RepeatGenome.ClassifyReads()
 */
 type ReadResponse struct {
-    Seq       TextSeq
+    Seq       []byte
     ClassNode *ClassNode
 }
 
 /*
-   Classifies each read in a slice of reads, stored as type TextSeq.
+   Classifies each read in a slice of reads, stored as type []byte.
    The read and its classification are returned through responseChan.
    In the future, the reads may be of type Seq.
    However, this currently seems to be the fastest way of doing things.
    This version uses the first recognized kmer for classification - the Kraken-Q technique.
 */
-func (rg *RepeatGenome) QuickClassifyReads(readTextSeqs []TextSeq, responseChan chan ReadResponse) {
+func (rg *RepeatGenome) QuickClassifyReads(readTextSeqs [][]byte, responseChan chan ReadResponse) {
 ReadLoop:
     for _, read := range readTextSeqs {
         // signed integers prevent underflow in down-counting for loops
@@ -44,8 +45,9 @@ ReadLoop:
                 }
             }
 
-            kmerBytes := read[i : i+k_]
-            kmerInt := kmerBytes.kmerInt().canonicalRepr()
+            kBytes := read[i : i+k_]
+            rawInt := bioutils.BytesToU64(kBytes)
+            kmerInt := bioutils.CanonicalRepr64(rawInt)
             kmerLCA := rg.getKmerLCA(kmerInt)
 
             if kmerLCA != nil {
@@ -60,13 +62,13 @@ ReadLoop:
 }
 
 /*
-   Classifies each read in a slice of reads, stored as type TextSeq.
+   Classifies each read in a slice of reads, stored as type []byte.
    The read and its classification are returned through responseChan.
    In the future, the reads may be of type Seq.
    However, this currently seems to be the fastest way of doing things.
    This version returns the LCA of all recognized kmers' classifications.
 */
-func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs []TextSeq, responseChan chan ReadResponse) {
+func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs [][]byte, responseChan chan ReadResponse) {
     for _, read := range readTextSeqs {
         // signed integers prevent underflow in down-counting for loops
         k_ := int64(k)
@@ -84,8 +86,9 @@ func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs []TextSeq, responseChan c
                 }
             }
 
-            kmerBytes := read[i : i+k_]
-            kmerInt := kmerBytes.kmerInt().canonicalRepr()
+            kBytes := read[i : i+k_]
+            rawInt := bioutils.BytesToU64(kBytes)
+            kmerInt := bioutils.CanonicalRepr64(rawInt)
             kmerLCA := rg.getKmerLCA(kmerInt)
 
             if kmerLCA != nil {
@@ -107,7 +110,7 @@ func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs []TextSeq, responseChan c
    These are then merged into a single response chan, which is the return value.
    The useLCA parameter determines whether to use Quick or LCA read classification logic.
 */
-func (rg *RepeatGenome) GetClassChan(reads []TextSeq, useLCA bool) chan ReadResponse {
+func (rg *RepeatGenome) GetClassChan(reads [][]byte, useLCA bool) chan ReadResponse {
     responseChans := make([]chan ReadResponse, 0, numCPU)
 
     // dispatch one read-classifying goroutine per CPU
@@ -154,7 +157,7 @@ func (rg *RepeatGenome) GetClassChan(reads []TextSeq, useLCA bool) chan ReadResp
    However, we will used a FASTQ reader when we get past the initial testing phase.
    This could be done concurrently, considering how many disk accesses there are.
 */
-func (rg *RepeatGenome) GetProcReads() (error, []TextSeq) {
+func (rg *RepeatGenome) GetProcReads() (error, [][]byte) {
     workingDirName, err := os.Getwd()
     if err != nil {
         return err, nil
@@ -177,14 +180,14 @@ func (rg *RepeatGenome) GetProcReads() (error, []TextSeq) {
         }
     }
     // populate a list of the reads contained in each of these files
-    var reads []TextSeq
+    var reads [][]byte
     for _, fileinfo := range procFiles {
         err, readsBytes := fileLines(readsDirName + "/" + fileinfo.Name())
         if err != nil {
             return err, nil
         }
         for _, lineBytes := range readsBytes {
-            reads = append(reads, TextSeq(lineBytes))
+            reads = append(reads, lineBytes)
         }
     }
 
@@ -194,7 +197,7 @@ func (rg *RepeatGenome) GetProcReads() (error, []TextSeq) {
 /*
 
 */
-func (rg *RepeatGenome) GetSAMReads() (error, []TextSeq) {
+func (rg *RepeatGenome) GetSAMReads() (error, [][]byte) {
     workingDirName, err := os.Getwd()
     if err != nil {
         return err, nil
@@ -217,7 +220,7 @@ func (rg *RepeatGenome) GetSAMReads() (error, []TextSeq) {
         }
     }
     // populate a list of the reads contained in each of these files
-    var reads []TextSeq
+    var reads [][]byte
     for _, fileinfo := range samFiles {
         err, readsBytes := fileLines(readsDirName + "/" + fileinfo.Name())
         if err != nil {
@@ -235,7 +238,7 @@ func (rg *RepeatGenome) GetSAMReads() (error, []TextSeq) {
             if len(fields) != 12 {
                 return fmt.Errorf("RepeatGenome.GetSAMReads(): too few fields in line of SAM file %s", fileinfo.Name()), nil
             } else {
-                reads = append(reads, TextSeq(bytes.ToLower(fields[9])))
+                reads = append(reads, bytes.ToLower(fields[9]))
             }
         }
     }

@@ -137,8 +137,8 @@ func (rg *RepeatGenome) WriteMins() error {
     writer := bufio.NewWriter(outfile)
     defer writer.Flush()
 
-    kmerBuf := make(TextSeq, k, k)
-    minBuf := make(TextSeq, m, m)
+    kmerBuf := make([]byte, k, k)
+    minBuf := make([]byte, m, m)
 
     for _, thisMin := range rg.SortedMins {
         fillMinBuf(minBuf, thisMin)
@@ -160,7 +160,8 @@ func (rg *RepeatGenome) WriteMins() error {
 }
 */
 
-func (kmerInt KmerInt) print() {
+func KmerToBytes(kmerInt uint64) []byte {
+    b := make([]byte, k)
     var i uint8
     for i = 0; i < k; i++ {
         // this tricky bit arithmetic shifts the two bits of interests
@@ -168,24 +169,27 @@ func (kmerInt KmerInt) print() {
         // and statement
         switch (kmerInt >> (2 * (k - i - 1))) & 3 {
         case 0:
-            fmt.Print("a")
+            b = append(b, 'a')
             break
         case 1:
-            fmt.Print("c")
+            b = append(b, 'c')
             break
         case 2:
-            fmt.Print("g")
+            b = append(b, 'g')
             break
         case 3:
-            fmt.Print("t")
+            b = append(b, 't')
             break
         default:
             panic("error in printSeqInt() base selection")
         }
     }
+
+    return b
 }
 
-func (minInt MinInt) print() {
+func MinToBytes(minInt uint32) []byte {
+    b := make([]byte, k)
     var i uint8
     for i = 0; i < m; i++ {
         // this tricky bit arithmetic shifts the two bits of interests
@@ -193,24 +197,26 @@ func (minInt MinInt) print() {
         // and statement
         switch (minInt >> (2 * (m - i - 1))) & 3 {
         case 0:
-            fmt.Print("a")
+            b = append(b, 'a')
             break
         case 1:
-            fmt.Print("c")
+            b = append(b, 'c')
             break
         case 2:
-            fmt.Print("g")
+            b = append(b, 'g')
             break
         case 3:
-            fmt.Print("t")
+            b = append(b, 't')
             break
         default:
             panic("error in printSeqInt() base selection")
         }
     }
+
+    return b
 }
 
-func writeKmerInt(writer io.ByteWriter, seqInt KmerInt) error {
+func writeKmerInt(writer io.ByteWriter, seqInt uint64) error {
     var i uint8
     var err error
     for i = 0; i < k; i++ {
@@ -240,7 +246,7 @@ func writeKmerInt(writer io.ByteWriter, seqInt KmerInt) error {
     return nil
 }
 
-func writeMinInt(writer io.ByteWriter, seqInt MinInt) error {
+func writeMinInt(writer io.ByteWriter, seqInt uint32) error {
     var i uint8
     var err error
     for i = 0; i < m; i++ {
@@ -271,8 +277,8 @@ func writeMinInt(writer io.ByteWriter, seqInt MinInt) error {
 }
 
 // assumes that all bytes in the slice to be filled are initialized
-// (a.k.a initialize buffer with make(TextSeq, k, k))
-func fillKmerBuf(slice TextSeq, seqInt KmerInt) {
+// (a.k.a initialize buffer with make([]byte, k, k))
+func fillKmerBuf(slice []byte, seqInt uint64) {
     if len(slice) > 31 {
         panic("slice of length greater than 31 passed to fillKmerBuf()")
     }
@@ -296,7 +302,7 @@ func fillKmerBuf(slice TextSeq, seqInt KmerInt) {
     }
 }
 
-func fillMinBuf(slice TextSeq, seqInt MinInt) {
+func fillMinBuf(slice []byte, seqInt uint32) {
     if len(slice) > 15 {
         panic("slice of length greater than 15 passed to fillMinBuf()")
     }
@@ -513,7 +519,7 @@ func (rg *RepeatGenome) ReadKraken(infile *os.File) error {
         if err != nil {
             return fmt.Errorf("RepeatGenome.ReadKraken():" + err.Error())
         }
-        rg.SortedMins = append(rg.SortedMins, MinInt(minInt))
+        rg.SortedMins = append(rg.SortedMins, uint32(minInt))
     }
 
     // populate rg.MinCounts
@@ -596,7 +602,7 @@ func readSimSeqReads(filepath string) (error, Seqs) {
 
     simReads := make(Seqs, 0, len(lines))
     for _, line := range lines {
-        simReads = append(simReads, TextSeq(line).Seq())
+        simReads = append(simReads, GetSeq(line))
     }
     return nil, simReads
 }

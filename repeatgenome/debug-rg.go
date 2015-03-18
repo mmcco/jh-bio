@@ -6,6 +6,7 @@
 package repeatgenome
 
 import (
+    "github.com/plsql/jh-bio/bioutils"
     "fmt"
     "os"
     "reflect"
@@ -15,16 +16,13 @@ import (
 func (rg *RepeatGenome) printSample(numMins, numKmers int) {
     for i := 0; i < len(rg.SortedMins); i += len(rg.SortedMins) / numMins {
         thisMin := rg.SortedMins[i]
-        thisMin.print()
-        fmt.Println()
+        fmt.Print("%d\n", thisMin)
         theseKmers := rg.getMinsKmers(thisMin)
         if len(theseKmers) > numKmers {
             theseKmers = theseKmers[:numKmers]
         }
         for _, kmer := range theseKmers {
-            fmt.Print("\t")
-            kmer.Int().print()
-            fmt.Printf("\t%s\n", rg.ClassTree.NodesByID[kmer.ClassID()].Name)
+            fmt.Printf("\t%d\t%s\n", kmer.Int(), rg.ClassTree.NodesByID[kmer.ClassID()].Name)
         }
     }
 }
@@ -75,18 +73,14 @@ func (rg *RepeatGenome) RunDebugTests() {
     fmt.Println("max64(int64(5), int64(7)):", max64(int64(5), int64(7)))
     fmt.Println()
 
-    testSeq := TextSeq("atgtttgtgtttttcataaagacgaaagatg")
-    thisKmer := testSeq.kmerInt()
-    thisMin := thisKmer.Minimize()
-    fmt.Println("minimizer of 'tgctcctgtcatgcatacgcaggtcatgcat': ")
-    thisMin.print()
+    thisKmer := bioutils.BytesToU64([]byte("atgtttgtgtttttcataaagacgaaagatg"))
+    thisMin := bioutils.Minimize(thisKmer)
+    fmt.Printf("minimizer of 'tgctcctgtcatgcatacgcaggtcatgcat': %s\n", string(MinToBytes(thisMin)))
     fmt.Println()
 
-    fmt.Print("revComp of ")
-    thisKmer.print()
-    fmt.Println(":")
-    thisKmer.revComp().print()
-    fmt.Println()
+    fmt.Print("revComp of %s: %d\n",
+        string(KmerToBytes(thisKmer)),
+        string(KmerToBytes(bioutils.RevComp64(thisKmer))))
     fmt.Printf("Kmer struct size: %d\n", unsafe.Sizeof(Kmer{}))
     fmt.Println()
 
@@ -101,9 +95,9 @@ func (rg *RepeatGenome) RunDebugTests() {
 }
 
 func DebugSeq() {
-    ts := TextSeq("tgaatatacgtagctctagctagcgcttatatg")
-    fmt.Println("ts:", ts)
-    s := ts.Seq()
+    ts := []byte("tgaatatacgtagctctagctagcgcttatatg")
+    fmt.Println("ts:", string(ts))
+    s := GetSeq(ts)
     fmt.Print("s: ")
     s.Print()
     fmt.Println()
@@ -176,9 +170,8 @@ func (rg *RepeatGenome) checkIntegrity() {
     for _, kmer := range rg.Kmers {
         lca := rg.getKmerLCA(kmer.Int())
         if lca == nil {
-            fmt.Print("ERROR: kmer ")
-            kmer.Int().print()
-            fmt.Println("not found by rg.getKmer()")
+            fmt.Printf("ERROR: kmer %d not found by rg.getKmer()\n",
+                string(KmerToBytes(kmer.Int())))
             os.Exit(1)
         }
     }

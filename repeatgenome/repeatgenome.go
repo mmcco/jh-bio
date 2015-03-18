@@ -27,7 +27,7 @@ var k, m uint8
 
 // kMask and mMask contain k and m consecutive right aligned 1 bits
 // respectively (e.g. "0000011111111").
-var kMask, mMask KmerInt
+var kMask, mMask uint64
 
 // minSliceSize is the size of a slice that contains indexes for all
 // possible mMers.
@@ -172,22 +172,29 @@ type ClassTree struct {
    01 = 'c'
    10 = 'g'
    11 = 't'
-*/
-type KmerInt uint64
-type KmerInts []KmerInt
 
-// A two-bits-per-base sequence of up to 15 bases, with low-bits
-// occupied first.
-type MinInt uint32
-type MinInts []MinInt
+   The definitions of KmerInt was previously here, but I reverted to uint64 for
+   simplicity.
+*/
+type KmerInts []uint64
+
+/* A two-bits-per-base sequence of up to 15 bases, with low-bits
+   occupied first.
+
+   The definitions of MinInt was previously here, but I reverted to uint32 for
+   simplicity.
+*/
+type MinInts []uint32
 
 /*
    Indexes the base of a kmer that is the starting index of its
    minimizer. If less than 32, the minimizer is the positive strand
    representation Otherwise, the minimizer is the reverse complement
    of kmer[minkey%32 : minkey + (m%32)]
+
+   The definition of MinKey previously existed here, but I
+   reverted to uint8 for simplicity.
 */
-type MinKey uint8
 
 /*
    A type synonym representing a ClassNode by ID. Used to
@@ -220,15 +227,15 @@ type Seqs []Seq
 
 // A 2-dimensional map used to represent a newly-parsed
 // FASTA-formatted reference genome.
-type Chroms map[string](map[string]TextSeq)
+type Chroms map[string](map[string][]byte)
 
-func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
+func parseGenome(genomeName string) (error, Chroms) {
     chromFileInfos, err := ioutil.ReadDir(genomeName + "-fasta")
     if err != nil {
         return fmt.Errorf("repeatgenome.parseGenome():" + err.Error()), nil
     }
     warned := false
-    chroms := make(map[string](map[string]TextSeq))
+    chroms := make(map[string](map[string][]byte))
     // used below to store the two keys for RepeatGenome.chroms
     for i := range chromFileInfos {
         chromFilename := chromFileInfos[i].Name()
@@ -259,9 +266,9 @@ func parseGenome(genomeName string) (error, map[string](map[string]TextSeq)) {
             }
         }
 
-        chroms[chromName] = make(map[string]TextSeq)
+        chroms[chromName] = make(map[string][]byte)
         for seqName, seqBytes := range seqMap {
-            chroms[chromName][seqName] = TextSeq(bytes.ToLower(seqBytes))
+            chroms[chromName][seqName] = bytes.ToLower(seqBytes)
         }
     }
     return nil, chroms
