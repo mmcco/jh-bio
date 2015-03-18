@@ -302,12 +302,6 @@ func New(config Config) (error, *RepeatGenome) {
     rg.getClassTree()
 
     if config.ForceGen {
-        // TEMP
-        /*
-           simpleMap := rg.genSimpleMap()
-           fmt.Println("len(simpleMap):", len(simpleMap))
-           os.Exit(0)
-        */
         rg.genKrakenLib()
         err = rg.WriteKraken()
         if err != nil {

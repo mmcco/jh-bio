@@ -127,40 +127,6 @@ func (refGenome *RepeatGenome) PrintChromInfo() {
     }
 }
 
-/*
-func (rg *RepeatGenome) WriteMins() error {
-    filename := strings.Join([]string{rg.Name, ".mins"}, "")
-    outfile, err := os.Create(filename)
-    if err != nil {
-        return err
-    }
-    defer outfile.Close()
-    writer := bufio.NewWriter(outfile)
-    defer writer.Flush()
-
-    kmerBuf := make([]byte, k, k)
-    minBuf := make([]byte, m, m)
-
-    for _, thisMin := range rg.SortedMins {
-        fillMinBuf(minBuf, thisMin)
-        _, err = fmt.Fprintf(writer, ">%s\n", minBuf)
-        if err != nil {
-            return err
-        }
-        for _, kmer := range rg.getMinsKmers(thisMin) {
-            kmerSeqInt := *(*KmerInt)(unsafe.Pointer(&kmer[0]))
-            classID := *(*ClassID)(unsafe.Pointer(&kmer[8]))
-            fillKmerBuf(kmerBuf, kmerSeqInt)
-            _, err = fmt.Fprintf(writer, "\t%s %s\n", kmerBuf, rg.ClassTree.NodesByID[classID].Name)
-            if err != nil {
-                return err
-            }
-        }
-    }
-    return nil
-}
-*/
-
 // assumes that all bytes in the slice to be filled are initialized
 // (a.k.a initialize buffer with make([]byte, k, k))
 func fillKmerBuf(slice []byte, seqInt uint64) {
