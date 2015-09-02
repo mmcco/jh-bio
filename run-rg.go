@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"github.com/plsql/jh-bio/repeatgenome"
+	"github.com/mmcco/jh-bio/repeatgenome"
 	"io/ioutil"
 	"os"
 	"runtime/pprof"
