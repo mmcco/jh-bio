@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/mmcco/jh-bio/repeatgenome"
-	"io/ioutil"
 	"os"
 	"runtime/pprof"
 	"strconv"
@@ -24,17 +23,11 @@ func lines(byteSlice []byte) [][]byte {
 	return lines
 }
 
-func fileLines(filepath string) (err error, linesBytes [][]byte) {
-	rawBytes, err := ioutil.ReadFile(filepath)
-	if err != nil {
-		return err, nil
-	} else {
-		return nil, lines(rawBytes)
-	}
-}
+/*
+   Derived from https://github.com/dustin/go-humanize
 
-// Derived from https://github.com/dustin/go-humanize
-// Returns a string representing the int, with commas for readability.
+   Returns a string representing the int, with commas for readability.
+*/
 func comma(v uint64) string {
 	sign := ""
 	if v < 0 {
@@ -70,8 +63,8 @@ func getReadsDirName(genomeName string) string {
 }
 
 /*
-   Calculates and prints statistics about the number of kmers associated
-   with a unique repeat type.
+   Calculates and prints statistics about the number of kmers associated with a
+   unique repeat type.
 
    Used to test the performance of repeatgenome's simple flavor.
 */
