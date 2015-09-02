@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"github.com/mmcco/jh-bio/bioutils"
 	"io"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"unsafe"
@@ -453,10 +454,12 @@ func (classNode *ClassNode) printTreeRec(indent int, printLeaves bool) {
 }
 
 func readSimSeqReads(filepath string) (error, Seqs) {
-	err, lines := fileLines(filepath)
+	rawBytes, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		return err, nil
 	}
+
+	lines := lines(rawBytes)
 
 	simReads := make(Seqs, 0, len(lines))
 	for _, line := range lines {
@@ -477,10 +480,12 @@ type ReadSAMResponse struct {
 }
 
 func parseReadSAMs(filepath string) (error, []ReadSAM) {
-	err, lines := fileLines(filepath)
+	rawBytes, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		return err, nil
 	}
+
+	lines := lines(rawBytes)
 
 	if len(lines) < 3 {
 		err := fmt.Errorf("repeatgenome.parseReadSAMs(): only %d lines in SAM file %s - need at least three", len(lines), filepath)

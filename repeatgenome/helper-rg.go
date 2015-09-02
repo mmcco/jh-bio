@@ -8,7 +8,6 @@ package repeatgenome
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"strconv"
 	"strings"
 )
@@ -53,19 +52,6 @@ func lines(byteSlice []byte) [][]byte {
 		lines = lines[:len(lines)-1]
 	}
 	return lines
-}
-
-/*
-   Reads the file at the supplied path and returns an error or its lines'
-   bytes.
-*/
-func fileLines(filepath string) (err error, linesBytes [][]byte) {
-	rawBytes, err := ioutil.ReadFile(filepath)
-	if err != nil {
-		return err, nil
-	} else {
-		return nil, lines(rawBytes)
-	}
 }
 
 func max(a int, b int) int {

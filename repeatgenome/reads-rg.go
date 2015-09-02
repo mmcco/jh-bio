@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/mmcco/jh-bio/bioutils"
+	"io/ioutil"
 	"os"
 	"sync"
 )
@@ -185,10 +186,13 @@ func (rg *RepeatGenome) GetProcReads() (error, [][]byte) {
 	// populate a list of the reads contained in each of these files
 	var reads [][]byte
 	for _, fileinfo := range procFiles {
-		err, readsBytes := fileLines(readsDirName + "/" + fileinfo.Name())
+		filepath := readsDirName + "/" + fileinfo.Name()
+		rawBytes, err := ioutil.ReadFile(filepath)
 		if err != nil {
 			return err, nil
 		}
+		readsBytes := lines(rawBytes)
+
 		for _, lineBytes := range readsBytes {
 			reads = append(reads, lineBytes)
 		}
@@ -225,10 +229,13 @@ func (rg *RepeatGenome) GetReads() (error, [][]byte) {
 	// populate a list of the reads contained in each of these files
 	var reads [][]byte
 	for _, fileinfo := range samFiles {
-		err, readsBytes := fileLines(readsDirName + "/" + fileinfo.Name())
+		filepath := readsDirName + "/" + fileinfo.Name()
+		rawBytes, err := ioutil.ReadFile(filepath)
 		if err != nil {
 			return err, nil
 		}
+		readsBytes := lines(rawBytes)
+
 		// drop header
 		if len(readsBytes) < 3 {
 			return fmt.Errorf("RepeatGenome.GetReads(): too few lines in SAM file %s - header missing", fileinfo.Name()), nil
