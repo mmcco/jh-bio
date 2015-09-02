@@ -4,11 +4,10 @@ repeatgenome
 Introduction
 ------------
 
-While still under heavy development, this package is in what will
-likely be its long-term and stable form.
-
 RepeatGenome uses known [repeat sequences](http://biol.lf1.cuni.cz/ucebnice/en/repetitive_dna.htm)
 to assist in sequence alignment.
+
+This package is in what will likely be its long-term and stable form.
 
 It implements a slightly modified version of Kraken, a metagenomics
 algorithm. For some constant *k*, Kraken associates each *k*-long

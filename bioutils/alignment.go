@@ -10,13 +10,15 @@ import (
 	"fmt"
 )
 
-const GAP_COST float64 = 0.5
+const GAP_SCORE float64 = -0.5
+const MATCH_SCORE float64 = 1.0
+const MISMATCH_SCORE float64 = -2.0
 
-func getCost(a []byte, aIndex int, b []byte, bIndex int) float64 {
-	if a[aIndex] == b[bIndex] {
-		return 1.0
+func getCost(a byte, b byte) float64 {
+	if a == b {
+		return MATCH_SCORE
 	} else {
-		return -2.0
+		return MISMATCH_SCORE
 	}
 }
 
@@ -36,21 +38,21 @@ func NeedlemanWunsch(a, b []byte) float64 {
 	}
 
 	for i := 0; i < len(a)+1; i++ {
-		d[i][0] = float64(-i) * GAP_COST
+		d[i][0] = float64(i) * GAP_SCORE
 	}
 
 	for j := 0; j < len(b)+1; j++ {
-		d[0][j] = float64(-j) * GAP_COST
+		d[0][j] = float64(j) * GAP_SCORE
 	}
 
 	for i := 1; i < len(a)+1; i++ {
 		for j := 1; j < len(b)+1; j++ {
-			cost := getCost(a, i-1, b, j-1)
+			cost := getCost(a[i-1], b[j-1])
 
 			// find the lowest cost
 			d[i][j] = maxF64(
-				d[i-1][j]-GAP_COST,
-				maxF64(d[i][j-1]-GAP_COST, d[i-1][j-1]+cost))
+				d[i-1][j]+GAP_SCORE,
+				maxF64(d[i][j-1]+GAP_SCORE, d[i-1][j-1]+cost))
 		}
 	}
 
@@ -78,12 +80,12 @@ func SmithWaterman(a, b []byte) float64 {
 
 	for i := 1; i < len(a)+1; i++ {
 		for j := 1; j < len(b)+1; j++ {
-			cost := getCost(a, i-1, b, j-1)
+			cost := getCost(a[i-1], b[j-1])
 
 			// find the lowest cost
 			d[i][j] = maxF64(
-				maxF64(0, d[i-1][j]-GAP_COST),
-				maxF64(d[i][j-1]-GAP_COST, d[i-1][j-1]+cost))
+				maxF64(0, d[i-1][j]+GAP_SCORE),
+				maxF64(d[i][j-1]+GAP_SCORE, d[i-1][j-1]+cost))
 
 			// save if it is the biggest thus far
 			if d[i][j] > maxSoFar {
