@@ -8,9 +8,8 @@ import (
 )
 
 /*
-   Ignores semicolon syntax for now.
-
-   Could later use speed hack of accumulating slices and calling bytes.Join() at the end.
+   Ignores semicolon syntax for now. Could later use speed hack of accumulating
+   slices and calling bytes.Join() at the end.
 */
 func ReadFASTA(reader io.Reader) (error, map[string][]byte) {
 	fileBytes, err := ioutil.ReadAll(reader)

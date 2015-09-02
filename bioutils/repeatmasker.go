@@ -10,12 +10,11 @@ import (
 )
 
 /*
-   RepeatMasker is a program that takes as input a set of reference
-   repeat sequences and a reference genome. It outputs "matches",
-   specific instances of supplied reference repeats in the supplied
-   reference genome. These are stored in the file
-   <genome-name>.fa.out, and are parsed line-by-line into values of
-   this type.
+   RepeatMasker is a program that takes as input a set of reference repeat
+   sequences and a reference genome. It outputs "matches", specific instances
+   of supplied reference repeats in the supplied reference genome. These are
+   stored in the file <genome-name>.fa.out, and are parsed line-by-line into
+   values of this type.
 
    Match.SW_Score - Smith-Waterman score, describing the likeness of
        this match to the repeat reference sequence.
@@ -121,10 +120,10 @@ func ParseMatches(reader io.Reader) (error, Matches) {
 		var match Match
 		match.IsRevComp = rawVals[8] == "C"
 
-		// TODO: in the future, check to ensure that the parentheses
-		// exist should be added
-		// TODO: it would also be sensible to check that rawVals[8] is
-		// either "C" or "+"
+		// TODO: in the future, check to ensure that the parentheses exist
+		// should be added
+		// TODO: it would also be sensible to check that rawVals[8] is either
+		// "C" or "+"
 		// remove enclosing parens
 		rawVals[7] = rawVals[7][1 : len(rawVals[7])-1]
 		if match.IsRevComp {
@@ -133,8 +132,10 @@ func ParseMatches(reader io.Reader) (error, Matches) {
 			rawVals[13] = rawVals[13][1 : len(rawVals[13])-1]
 		}
 
-		// everything in this block is just typical trimming,
-		// converting, and error checking
+		/*
+		   Everything in this block is just typical trimming, converting, and
+		   error checking.
+		*/
 		sw_Score, err := strconv.ParseInt(rawVals[0], 10, 32)
 		if err != nil {
 			return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
@@ -184,22 +185,28 @@ func ParseMatches(reader io.Reader) (error, Matches) {
 			return fmt.Errorf("repeatgenome.parseMatches():" + err.Error()), nil
 		}
 
-		// Necessary swaps to convert reverse complement repeat
-		// indexes to positive-strand indexes.
+		/*
+		   Necessary swaps to convert reverse complement repeat indexes to
+		   positive-strand indexes.
+		*/
 		if match.IsRevComp {
 			match.RepeatStart = match.RepeatRemains
 			match.RepeatEnd = match.RepeatStart
 			match.RepeatRemains = match.RepeatRemains + (match.RepeatEnd - match.RepeatStart)
 		}
 
-		// Decrement match.SeqStart and match.RepeatStart so that they
-		// work from a start index of 0 rather than 1.
-		// That way, we can use them without modification in slices.
+		/*
+		   Decrement match.SeqStart and match.RepeatStart so that they
+		   work from a start index of 0 rather than 1.
+		   That way, we can use them without modification in slices.
+		*/
 		match.SeqStart--
 		match.RepeatStart--
 
-		// "Other" and "Unknown" classes are heirarchically
-		// meaningless and really just mean "root", so we remove them
+		/*
+		   "Other" and "Unknown" classes are heirarchically meaningless and
+		   really just mean "root", so we remove them
+		*/
 		if match.RepeatClass[0] == "Other" || match.RepeatClass[0] == "Unknown" {
 			match.RepeatClass = match.RepeatClass[1:]
 		}
@@ -219,9 +226,7 @@ func ParseMatches(reader io.Reader) (error, Matches) {
 	return nil, matches
 }
 
-/*
-   Returns the size in bases of a repeat instance.
-*/
+// Returns the size in bases of a repeat instance.
 func (match Match) Size() uint64 {
 	return match.SeqEnd - match.SeqStart
 }

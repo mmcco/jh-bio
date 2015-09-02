@@ -5,7 +5,8 @@ import (
 )
 
 /*
-   The canonical representation of a sequence is the lexicographically smaller of its positive-strand and its reverse complement.
+   The canonical representation of a sequence is the lexicographically smaller
+   of its positive-strand and its reverse complement.
 */
 func CanonicalRepr32(seq uint32) uint32 {
 	revComp := RevComp32(seq)
@@ -17,7 +18,8 @@ func CanonicalRepr32(seq uint32) uint32 {
 }
 
 /*
-   The canonical representation of a sequence is the lexicographically smaller of its positive-strand and its reverse complement.
+   The canonical representation of a sequence is the lexicographically smaller
+   of its positive-strand and its reverse complement.
 */
 func CanonicalRepr64(seq uint64) uint64 {
 	revComp := RevComp64(seq)
@@ -29,20 +31,27 @@ func CanonicalRepr64(seq uint64) uint64 {
 }
 
 /*
-   Returns the index of the uint64's minimizer.
-   The positive-strand index of the minimizer is minKey % K.
-   If the MinKey is >= K, the minimizer is the reverse complement of the indexed minimizer.
+   Returns the index of the uint64's minimizer. The positive-strand index of
+   the minimizer is minKey % K. If the MinKey is >= K, the minimizer is the
+   reverse complement of the indexed minimizer.
 */
 func MinKey(seq uint64) uint8 {
 	rcKmerInt := RevComp64(seq)
 	numPossMins := uint8(K - M + 1)
-	// Despite being minimizers (and therefore expected to be
-	// uint32s), we make possMin and currMin uint64s for ease of
-	// manipulation and then convert upon returning.
+
+	/*
+	   Despite being minimizers (and therefore expected to be
+	   uint32s), we make possMin and currMin uint64s for ease of
+	   manipulation and then convert upon returning.
+	*/
 	currMin := ^uint64(0) // initialize the current best minimizer candidate as MAX_INT
 	var currKey uint8 = 0
 
-	var i uint8 // the positive-strand start index of the minimizers tested in this iteration
+	/*
+	   the positive-strand start index of the minimizers tested in this
+	   iteration
+	*/
+	var i uint8
 	for i = 0; i < numPossMins; i++ {
 		possMin := minU64(MMask&seq, MMask&rcKmerInt)
 
@@ -118,18 +127,22 @@ func BytesToU32(seq []byte) uint32 {
 }
 
 /*
-   Return the minimizer of a uint64 using canonical representation (testing both the positive-strand and its reverse complement)
+   Return the minimizer of a uint64 using canonical representation (testing
+   both the positive-strand and its reverse complement)
 */
 func Minimize(seq uint64) uint32 {
 	rcKmerInt := RevComp64(seq)
-	// Despite being minimizers (and therefore expected to be
-	// uint32s), we make possMin and currMin KmerInts for ease of
-	// manipulation and then convert upon returning.
-	// Initialize the current best minimizer candidate as MAX_INT
+	/*
+	   Despite being minimizers (and therefore expected to be
+	   uint32s), we make possMin and currMin KmerInts for ease of
+	   manipulation and then convert upon returning.
+	   Initialize the current best minimizer candidate as MAX_INT
+	*/
 	currMin := ^uint64(0)
 	var possMin uint64
 
-	var i uint8 // the positive-strand index of the minimizers tested on the iteration
+	// the positive-strand index of the minimizers tested on the iteration
+	var i uint8
 	for i = 0; i <= K-M; i++ {
 		possMin = MMask & seq
 		if possMin < currMin {
@@ -148,10 +161,7 @@ func Minimize(seq uint64) uint32 {
 	return uint32(currMin)
 }
 
-/*
-   Returns the reverse complement of a sequence stored in
-   a uint32.
-*/
+// Returns the reverse complement of a sequence stored in a uint32.
 func RevComp32(seq uint32) uint32 {
 	var revComp uint32
 	var i uint8
@@ -163,10 +173,7 @@ func RevComp32(seq uint32) uint32 {
 	return revComp
 }
 
-/*
-   Returns the reverse complement of a sequence stored in
-   a uint64.
-*/
+// Returns the reverse complement of a sequence stored in a uint64.
 func RevComp64(seq uint64) uint64 {
 	var revComp uint64
 	var i uint8
@@ -182,9 +189,11 @@ func U64ToBytes(kmerInt uint64) []byte {
 	b := make([]byte, K)
 	var i uint8
 	for i = 0; i < K; i++ {
-		// this tricky bit arithmetic shifts the two bits of interests
-		// to the two rightmost positions, then selects them with the
-		// and statement
+		/*
+		   This tricky bit arithmetic shifts the two bits of interests
+		   to the two rightmost positions, then selects them with the
+		   and statement.
+		*/
 		switch (kmerInt >> (2 * (K - i - 1))) & 3 {
 		case 0:
 			b = append(b, 'a')
@@ -210,9 +219,11 @@ func U32ToBytes(minInt uint32) []byte {
 	b := make([]byte, K)
 	var i uint8
 	for i = 0; i < M; i++ {
-		// this tricky bit arithmetic shifts the two bits of interests
-		// to the two rightmost positions, then selects them with the
-		// and statement
+		/*
+		   This tricky bit arithmetic shifts the two bits of interests
+		   to the two rightmost positions, then selects them with the
+		   and statement.
+		*/
 		switch (minInt >> (2 * (M - i - 1))) & 3 {
 		case 0:
 			b = append(b, 'a')

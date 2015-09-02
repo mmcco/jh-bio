@@ -1,5 +1,6 @@
 /*
-   Functions used for (mostly simple) statistical analysis of the repeat sequence and Kraken data.
+   Functions used for (mostly simple) statistical analysis of the repeat
+   sequence and Kraken data.
 */
 
 package repeatgenome
@@ -31,8 +32,9 @@ func (rg *RepeatGenome) KmersGBSize() float64 {
 }
 
 /*
-   Returns the percent of a RepeatGenome's reference bases that are contained in a repeat instance.
-   It makes the assumption that no base is contained in more than one repeat instance.
+   Returns the percent of a RepeatGenome's reference bases that are contained
+   in a repeat instance. It makes the assumption that no base is contained in
+   more than one repeat instance.
 */
 func (rg *RepeatGenome) PercentRepeats() float64 {
 	var repeatBases uint64 = 0
@@ -57,7 +59,8 @@ func (repeat *Repeat) Size() uint64 {
 }
 
 /*
-   Returns the sum of the sizes of all repeat instances in the supplied ClassNode's subtree.
+   Returns the sum of the sizes of all repeat instances in the supplied
+   ClassNode's subtree.
 */
 func (classNode *ClassNode) Size() uint64 {
 	if classNode == nil {
@@ -80,10 +83,14 @@ func (classNode *ClassNode) Size() uint64 {
 }
 
 /*
-   Returns the number of base pairs from which the supplied read could have originated, assuming that its classification was correct.
-   This is done in terms of Kraken-Q logic, meaning that there is at least one kmer shared between the repeat reference and the read.
-   Therefore, the read must overlap a repeat reference from the classified subtree by at least k bases.
-   This function is used to calculate the probability of correct classification assuming random selection, and the amount to which a classification narrows a read's potential origin.
+   Returns the number of base pairs from which the supplied read could have
+   originated, assuming that its classification was correct. This is done in
+   terms of Kraken-Q logic, meaning that there is at least one kmer shared
+   between the repeat reference and the read. Therefore, the read must overlap
+   a repeat reference from the classified subtree by at least k bases. This
+   function is used to calculate the probability of correct classification
+   assuming random selection, and the amount to which a classification narrows
+   a read's potential origin.
 */
 func (readResp ReadResponse) HangingSize() uint64 {
 	classNode := readResp.ClassNode
@@ -108,10 +115,11 @@ func (readResp ReadResponse) HangingSize() uint64 {
 }
 
 /*
-   Returns the average percent of the genome a read from the given set could have originated from, assuming their classification was correct.
-   This is used to estimate how much the classification assisted us in locating reads' origins.
-   The more specific and helpful the classifications are, the lower the percentage will be.
-   Uses a cumulative average to prevent overflow.
+   Returns the average percent of the genome a read from the given set could
+   have originated from, assuming their classification was correct. This is
+   used to estimate how much the classification assisted us in locating reads'
+   origins. The more specific and helpful the classifications are, the lower
+   the percentage will be. Uses a cumulative average to prevent overflow.
 */
 func (rg *RepeatGenome) AvgPossPercentGenome(resps []ReadResponse, strict bool) float64 {
 	classNodeSizes := make(map[*ClassNode]float64, len(rg.ClassTree.ClassNodes))
@@ -137,8 +145,9 @@ func (rg *RepeatGenome) AvgPossPercentGenome(resps []ReadResponse, strict bool) 
 }
 
 /*
-   A helper function for the PercentTrueClassification() below
-   It recursively determines whether a read originated from a reference repeat instance in the subtree indicated by the supplied ClassNode.
+   A helper function for the PercentTrueClassification() below It recursively
+   determines whether a read originated from a reference repeat instance in the
+   subtree indicated by the supplied ClassNode.
 */
 func (rg *RepeatGenome) recNodeSearch(classNode *ClassNode, readSAM ReadSAM, strict bool) bool {
 	if classNode != nil && classNode.Repeat != nil {
@@ -178,9 +187,9 @@ func (rg *RepeatGenome) RepeatIsCorrect(readSAMRepeat ReadSAMRepeat, strict bool
 	readSAM, repeat := readSAMRepeat.ReadSAM, readSAMRepeat.Repeat
 	read, seqName, startInd := readSAM.TextSeq, readSAM.SeqName, readSAM.StartInd
 	if repeat == nil {
-		// We will for now use a panic rather than an error.
-		// This is for speed and simplicity, and because the caller
-		// logically should ensure than the repeat is non-nil.
+		// We will for now use a panic rather than an error. This is for speed
+		// and simplicity, and because the caller logically should ensure than
+		// the repeat is non-nil.
 		panic("RepeatGenome.RepeatIsCorrect(): readSAMRepeat.Repeat is nil")
 	}
 	for _, match := range repeat.Instances {
@@ -252,9 +261,11 @@ func TestNodeSearch(classNode *ClassNode, readSAM ReadSAM) bool {
 */
 
 /*
-   Determines whether a read overlaps any repeat instances in the given ClassNode's subtree.
-   If the argument strict is true, the read must be entirely contained in a reference repeat instance (classic Kraken logic).
-   Otherwise, the read must overlap a reference repeat instance by at least k bases.
+   Determines whether a read overlaps any repeat instances in the given
+   ClassNode's subtree. If the argument strict is true, the read must be
+   entirely contained in a reference repeat instance (classic Kraken logic).
+   Otherwise, the read must overlap a reference repeat instance by at least k
+   bases.
 */
 func (rg *RepeatGenome) PercentTrueClassifications(responses []ReadSAMResponse, useStrict bool) float64 {
 	var classifications, correctClassifications uint64 = 0, 0
@@ -271,9 +282,11 @@ func (rg *RepeatGenome) PercentTrueClassifications(responses []ReadSAMResponse, 
 }
 
 /*
-   Returns the number of non-ambiguous (non-n-containing), non-unique kmers in the reference genome.
-   It is used for simple printed statistics, and to determine the amount of memory to allocate for raw-kmer-containing data structures.
-   This is different from the count returned by krakenFirstPass() because it does not allow ambiguous kmers.
+   Returns the number of non-ambiguous (non-n-containing), non-unique kmers in
+   the reference genome. It is used for simple printed statistics, and to
+   determine the amount of memory to allocate for raw-kmer-containing data
+   structures. This is different from the count returned by krakenFirstPass()
+   because it does not allow ambiguous kmers.
 */
 func (rg *RepeatGenome) numRawKmers() uint64 {
 	var numRawKmers uint64 = 0

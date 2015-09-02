@@ -1,5 +1,6 @@
 /*
-   A set of functions and datatypes used for reading input data, Kraken library writing, and JSON data writing.
+   A set of functions and datatypes used for reading input data, Kraken library
+   writing, and JSON data writing.
 */
 
 package repeatgenome
@@ -17,12 +18,11 @@ import (
 	"unsafe"
 )
 
-// A magic value, used to give an explicit, declarative error message
-// if the user tries to parse a non-Kraken file.
+// A magic value, used to give an explicit, declarative error message if the
+// user tries to parse a non-Kraken file.
 const magicVal int = 13377331
 
-// Used only for recursively writing the JSON representation of the
-// ClassTree.
+// Used only for recursively writing the JSON representation of the ClassTree.
 type JSONNode struct {
 	Name     string      `json:"name"`
 	Size     uint64      `json:"size"`
@@ -30,10 +30,10 @@ type JSONNode struct {
 }
 
 /*
-   Writes a JSON representation of the class tree.
-   Used by the Javascript visualization, among other things.
-   Currently, each node is associated with a value "size", the number of kmers associated with it.
-   useCumSize determines whether the kmer count is cumulative, counting all kmers in its subtree.
+   Writes a JSON representation of the class tree. Used by the Javascript
+   visualization, among other things. Currently, each node is associated with a
+   value "size", the number of kmers associated with it. useCumSize determines
+   whether the kmer count is cumulative, counting all kmers in its subtree.
 */
 func (rg *RepeatGenome) WriteClassJSON(useCumSize, printLeaves bool) error {
 	tree := &rg.ClassTree
@@ -101,8 +101,8 @@ func (jsonNode *JSONNode) jsonRecSize() uint64 {
 }
 
 /*
-   Deletes the leaves from a JSONNode tree.
-   Used to ignore leaves for visualizations.
+   Deletes the leaves from a JSONNode tree. Used to ignore leaves for
+   visualizations.
 */
 func (jsonNode *JSONNode) deleteLeaves() {
 	branchChildren := []*JSONNode{}
@@ -127,8 +127,8 @@ func (refGenome *RepeatGenome) PrintChromInfo() {
 	}
 }
 
-// assumes that all bytes in the slice to be filled are initialized
-// (a.k.a initialize buffer with make([]byte, k, k))
+// assumes that all bytes in the slice to be filled are initialized (a.k.a
+// initialize buffer with make([]byte, k, k))
 func fillKmerBuf(slice []byte, seqInt uint64) {
 	if len(slice) > 31 {
 		panic("slice of length greater than 31 passed to fillKmerBuf()")
@@ -434,9 +434,8 @@ func (classTree *ClassTree) PrintTree() {
 	classTree.Root.printTreeRec(0, true)
 }
 
-// Doesn't print leaves.
-// Prevents the terminal from being flooded with Unknowns, Others, and
-// Simple Repeats.
+// Doesn't print leaves. Prevents the terminal from being flooded with
+// Unknowns, Others, and Simple Repeats.
 func (classTree *ClassTree) PrintBranches() {
 	classTree.Root.printTreeRec(0, false)
 }

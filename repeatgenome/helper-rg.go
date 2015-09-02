@@ -1,5 +1,6 @@
 /*
-   A collection of trivial functions used in other source files of the repeatgenome package.
+   A collection of trivial functions used in other source files of the
+   repeatgenome package.
 */
 
 package repeatgenome
@@ -13,7 +14,8 @@ import (
 )
 
 /*
-   Courtesy of https://github.com/dustin/go-humanize
+   Taken from https://github.com/dustin/go-humanize
+
    Returns a string representing the int with commas for readability.
 */
 func comma(v int) string {
@@ -54,7 +56,8 @@ func lines(byteSlice []byte) [][]byte {
 }
 
 /*
-   Reads the file at the supplied path and returns an error or its lines' bytes.
+   Reads the file at the supplied path and returns an error or its lines'
+   bytes.
 */
 func fileLines(filepath string) (err error, linesBytes [][]byte) {
 	rawBytes, err := ioutil.ReadFile(filepath)
@@ -158,9 +161,10 @@ func boolToInt(a bool) int {
 	}
 }
 
-// Takes as an argument the index of a minimizer in RepeatGenome.SortedMins - NOT the minimizer's actual value.
-// Returns a slice of the kmers associated with that minimizer.
-// Intended for non-performance-critical sections, like file writing.
+// Takes as an argument the index of a minimizer in RepeatGenome.SortedMins -
+// NOT the minimizer's actual value. Returns a slice of the kmers associated
+// with that minimizer. Intended for non-performance-critical sections, like
+// file writing.
 func (rg *RepeatGenome) getMinsKmers(minInt uint32) Kmers {
 	startInd := rg.MinOffsets[minInt]
 	endInd := startInd + int64(rg.MinCounts[minInt])

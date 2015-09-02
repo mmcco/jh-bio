@@ -13,7 +13,8 @@ import (
 )
 
 /*
-   The type sent back from read-classifying goroutines of RepeatGenome.ClassifyReads()
+   The type sent back from read-classifying goroutines of
+   RepeatGenome.ClassifyReads()
 */
 type ReadResponse struct {
 	Seq       []byte
@@ -21,11 +22,11 @@ type ReadResponse struct {
 }
 
 /*
-   Classifies each read in a slice of reads, stored as type []byte.
-   The read and its classification are returned through responseChan.
-   In the future, the reads may be of type Seq.
-   However, this currently seems to be the fastest way of doing things.
-   This version uses the first recognized kmer for classification - the Kraken-Q technique.
+   Classifies each read in a slice of reads, stored as type []byte. The read
+   and its classification are returned through responseChan. In the future, the
+   reads may be of type Seq. However, this currently seems to be the fastest
+   way of doing things. This version uses the first recognized kmer for
+   classification - the Kraken-Q technique.
 */
 func (rg *RepeatGenome) QuickClassifyReads(readTextSeqs [][]byte, responseChan chan ReadResponse) {
 ReadLoop:
@@ -61,11 +62,11 @@ ReadLoop:
 }
 
 /*
-   Classifies each read in a slice of reads, stored as type []byte.
-   The read and its classification are returned through responseChan.
-   In the future, the reads may be of type Seq.
-   However, this currently seems to be the fastest way of doing things.
-   This version returns the LCA of all recognized kmers' classifications.
+   Classifies each read in a slice of reads, stored as type []byte. The read
+   and its classification are returned through responseChan. In the future, the
+   reads may be of type Seq. However, this currently seems to be the fastest
+   way of doing things. This version returns the LCA of all recognized kmers'
+   classifications.
 */
 func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs [][]byte, responseChan chan ReadResponse) {
 	for _, read := range readTextSeqs {
@@ -103,10 +104,11 @@ func (rg *RepeatGenome) LCA_ClassifyReads(readTextSeqs [][]byte, responseChan ch
 }
 
 /*
-   Dispatches as many read-classifying goroutines as there are CPUs, giving each a subslice of the slice of reads provided.
-   Each read-classifying goroutine is given a unique response chan.
-   These are then merged into a single response chan, which is the return value.
-   The useLCA parameter determines whether to use Quick or LCA read classification logic.
+   Dispatches as many read-classifying goroutines as there are CPUs, giving
+   each a subslice of the slice of reads provided. Each read-classifying
+   goroutine is given a unique response chan. These are then merged into a
+   single response chan, which is the return value. The useLCA parameter
+   determines whether to use Quick or LCA read classification logic.
 */
 func (rg *RepeatGenome) GetClassChan(reads [][]byte, useLCA bool) chan ReadResponse {
 	responseChans := make([]chan ReadResponse, 0, numCPU)
@@ -129,7 +131,8 @@ func (rg *RepeatGenome) GetClassChan(reads [][]byte, useLCA bool) chan ReadRespo
 	master := make(chan ReadResponse)
 
 	for _, respChan := range responseChans {
-		// need respChan argument to prevent all goroutines from using same instance of respChan - language quirk
+		// need respChan argument to prevent all goroutines from using same
+		// instance of respChan - language quirk
 		go func(respChan chan ReadResponse) {
 			for resp := range respChan {
 				master <- resp
@@ -147,13 +150,15 @@ func (rg *RepeatGenome) GetClassChan(reads [][]byte, useLCA bool) chan ReadRespo
 }
 
 /*
-   A rather hairy function that classifies all reads in ./<genome-name>-reads/*.proc if any exist.
-   .proc files are our own creation for ease of parsing and testing.
-   They contain one lowercase read sequence per line, and nothing else.
-   We have a script that will convert FASTQ files to .proc files: github.com/mmcco/bioinformatics/blob/master/scripts/format-FASTA-reads.py
-   This is generally really easy to do.
-   However, we will used a FASTQ reader when we get past the initial testing phase.
-   This could be done concurrently, considering how many disk accesses there are.
+   A rather hairy function that classifies all reads in
+   ./<genome-name>-reads/*.proc if any exist. .proc files are our own creation
+   for ease of parsing and testing. They contain one lowercase read sequence
+   per line, and nothing else. We have a script that will convert FASTQ files
+   to .proc files:
+   github.com/mmcco/bioinformatics/blob/master/scripts/format-FASTA-reads.py
+   This is generally really easy to do. However, we will used a FASTQ reader
+   when we get past the initial testing phase. This could be done concurrently,
+   considering how many disk accesses there are.
 */
 func (rg *RepeatGenome) GetProcReads() (error, [][]byte) {
 	workingDirName, err := os.Getwd()

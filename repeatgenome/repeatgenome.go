@@ -31,8 +31,8 @@ var numCPU = runtime.NumCPU()
 // Used to write heap memory profile.
 var memProfFile *os.File
 
-// A value of type Config is passed to the New() function, which
-// constructs and returns a new RepeatGenome.
+// A value of type Config is passed to the New() function, which constructs and
+// returns a new RepeatGenome.
 type Config struct {
 	Name       string
 	Debug      bool
@@ -174,36 +174,33 @@ type KmerInts []uint64
 type MinInts []uint32
 
 /*
-   Indexes the base of a kmer that is the starting index of its
-   minimizer. If less than 32, the minimizer is the positive strand
-   representation Otherwise, the minimizer is the reverse complement
-   of kmer[minkey%32 : minkey + (m%32)]
+   Indexes the base of a kmer that is the starting index of its minimizer. If
+   less than 32, the minimizer is the positive strand representation Otherwise,
+   the minimizer is the reverse complement of kmer[minkey%32 : minkey + (m%32)]
 
-   The definition of MinKey previously existed here, but I
-   reverted to uint8 for simplicity.
+   The definition of MinKey previously existed here, but I reverted to uint8
+   for simplicity.
 */
 
 /*
-   A type synonym representing a ClassNode by ID. Used to
-   space-efficiently store a read's classification.
+   A type synonym representing a ClassNode by ID. Used to space-efficiently
+   store a read's classification.
 */
 type ClassID uint16
 
 /*
-   This is what is stored by the main Kraken data structure:
-   RepeatGenome.Kmers The first eight bits are the integer
-   representation of the kmer's sequence (type KmerInt). The last two
-   are the class ID (type ClassID).
+   This is what is stored by the main Kraken data structure: RepeatGenome.Kmers
+   The first eight bits are the integer representation of the kmer's sequence
+   (type KmerInt). The last two are the class ID (type ClassID).
 */
 type Kmer [10]byte
 type Kmers []Kmer
 type PKmers []*Kmer
 
 /*
-   Each base is represented by two bits. High-order bits are occupied
-   first. Remember that Seq.Len is the number of bases contained,
-   while len(Seq.Bytes) is the number of bytes necessary to represent
-   them.
+   Each base is represented by two bits. High-order bits are occupied first.
+   Remember that Seq.Len is the number of bases contained, while len(Seq.Bytes)
+   is the number of bytes necessary to represent them.
 */
 type Seq struct {
 	Bytes []byte
@@ -212,8 +209,8 @@ type Seq struct {
 
 type Seqs []Seq
 
-// A 2-dimensional map used to represent a newly-parsed
-// FASTA-formatted reference genome.
+// A 2-dimensional map used to represent a newly-parsed FASTA-formatted
+// reference genome.
 type Chroms map[string](map[string][]byte)
 
 func parseGenome(genomeName string) (error, Chroms) {
@@ -229,8 +226,8 @@ func parseGenome(genomeName string) (error, Chroms) {
 		chromName := chromFilename[:len(chromFilename)-3]
 		// "my_genome_name", "my_chrom_name"  ->  "my_genome_name/my_chrom_name"
 		chromFilepath := strings.Join([]string{genomeName + "-fasta", chromFilename}, "/")
-		// process the ref genome files (*.fa), not the repeat ref
-		// files (*.fa.out and *.fa.align) or anything else
+		// process the ref genome files (*.fa), not the repeat ref files
+		// (*.fa.out and *.fa.align) or anything else
 		infile, err := os.Open(chromFilepath)
 		if err != nil {
 			return err, nil
@@ -266,9 +263,9 @@ func New(config Config) (error, *RepeatGenome) {
 
 	runtime.GOMAXPROCS(numCPU)
 
-	// We popoulate the RepeatGenome mostly with helper functions.
-	// We should consider whether it makes more sense for them to
-	// alter the object directly, than to return their results.
+	// We populate the RepeatGenome mostly with helper functions. We should
+	// consider whether it makes more sense for them to alter the object
+	// directly, than to return their results.
 	rg := new(RepeatGenome)
 	rg.Name = config.Name
 
@@ -348,18 +345,17 @@ func New(config Config) (error, *RepeatGenome) {
 }
 
 func (rg *RepeatGenome) getRepeats() {
-	// we now populate a list of unique repeat types
-	// repeats are stored in the below slice, indexed by their ID
-	// We first determine the necessary size of the slice - we can't
-	// use append because matches are not sorted by repeatID.
+	// We now populate a list of unique repeat types. Repeats are stored in the
+	// below slice, indexed by their ID. We first determine the necessary size
+	// of the slice - we can't use append because matches are not sorted by
+	// repeatID.
 
 	rg.RepeatMap = make(map[string]*Repeat)
 
-	// DON'T use the second field of the range - this causes the Match
-	// struct to be copied.
-	// Creating an alias struct (match := rg.Matches[i]) of type Match
-	// rather than *Match causes the repeat.Instance item to point to
-	// a copy, not the original Match struct.
+	// DON'T use the second field of the range - this causes the Match struct
+	// to be copied. Creating an alias struct (match := rg.Matches[i]) of type
+	// Match rather than *Match causes the repeat.Instance item to point to a
+	// copy, not the original Match struct.
 	for i := range rg.Matches {
 		match := &rg.Matches[i]
 		// don't bother overwriting
@@ -380,7 +376,8 @@ func (rg *RepeatGenome) getRepeats() {
 }
 
 func (rg *RepeatGenome) getClassTree() {
-	// mapping to pointers allows us to make references (i.e. pointers) to values
+	// mapping to pointers allows us to make references (i.e. pointers) to
+	// values
 	tree := &rg.ClassTree
 	tree.ClassNodes = make(map[string](*ClassNode))
 	// would be prettier if expanded
@@ -396,8 +393,8 @@ func (rg *RepeatGenome) getClassTree() {
 	tree.NodesByID = append(tree.NodesByID, tree.Root)
 
 	for _, repeat := range rg.Repeats {
-		// process every heirarchy level (e.g. for "DNA/LINE/TiGGER",
-		// process "DNA", then "DNA/LINE", then "DNA/LINE/TiGGER")
+		// process every heirarchy level (e.g. for "DNA/LINE/TiGGER", process
+		// "DNA", then "DNA/LINE", then "DNA/LINE/TiGGER")
 		for j := 1; j <= len(repeat.ClassList); j++ {
 			thisClass := repeat.ClassList[:j]
 			thisClassName := strings.Join(thisClass, "/")
@@ -416,8 +413,8 @@ func (rg *RepeatGenome) getClassTree() {
 
 				tree.ClassNodes[thisClassName] = classNode
 				tree.NodesByID = append(tree.NodesByID, classNode)
-				// first case handles primary classes, as root is
-				// implicit and not listed in thisClass
+				// first case handles primary classes, as root is implicit and
+				// not listed in thisClass
 				if j == 1 {
 					classNode.Parent = tree.Root
 				} else {

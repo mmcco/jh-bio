@@ -9,9 +9,10 @@ import (
 )
 
 /*
-   Converts a TextSeq to the more memory-efficient Seq type.
-   Upper- and lower-case base bytes are currently supported, but stable code should immediately convert to lower-case.
-   The logic works and is sane, but could be altered in the future for brevity and efficiency.
+   Converts a TextSeq to the more memory-efficient Seq type. Upper- and
+   lower-case base bytes are currently supported, but stable code should
+   immediately convert to lower-case. The logic works and is sane, but could be
+   altered in the future for brevity and efficiency.
 */
 func GetSeq(textSeq []byte) Seq {
 	numBytes := ceilDiv(len(textSeq), 4)
@@ -20,10 +21,11 @@ func GetSeq(textSeq []byte) Seq {
 		Len:   uint64(len(textSeq)),
 	}
 
-	// determines how much to shift the current byte of interest
-	// starts at 6, wraps around to 254, which mods to 0
-	// therefore loops 6 -> 4 -> 2 -> 0 -> ...
-	// see the last line of the for-loop
+	/*
+	   Determines how much to shift the current byte of interest. Starts at 6,
+	   wraps around to 254, which mods to 0. Therefore loops 6 -> 4 -> 2 -> 0
+	   -> ... See the last line of the for-loop.
+	*/
 	var shift uint8 = 6
 
 	for i := 0; i < len(textSeq); i++ {
@@ -64,7 +66,8 @@ func GetSeq(textSeq []byte) Seq {
 }
 
 /*
-   Return the subsequence of the supplied Seq from a (inclusive) to b (exclusive), like a slice.
+   Return the subsequence of the supplied Seq from a (inclusive) to b
+   (exclusive), like a slice.
 */
 func (seq Seq) Subseq(a, b uint64) Seq {
 	numBytes := ceilDiv_U64(b-a, 4)
@@ -73,8 +76,10 @@ func (seq Seq) Subseq(a, b uint64) Seq {
 		Len:   b - a,
 	}
 
-	// How much to left-shift the byte currently being altered.
-	// For more details, see the identical usage in TextSeq.Seq()
+	/*
+	   How much to left-shift the byte currently being altered. For more
+	   details, see the identical usage in TextSeq.Seq()
+	*/
 	var shift uint8 = 6
 
 	var i uint64
@@ -85,25 +90,25 @@ func (seq Seq) Subseq(a, b uint64) Seq {
 	return subseq
 }
 
-/*
-   Return the i-th byte of the Seq (zero-indexed).
-*/
+// Return the i-th byte of the Seq (zero-indexed).
 func (seq Seq) GetBase(i uint64) uint8 {
 	thisByte := seq.Bytes[i/4]
 	return thisByte >> (6 - 2*(i%4))
 }
 
 /*
-   A more declarative and modifiable accessor function.
-   While it would almost certainly be inlined, this is such a performance-critical operation that this function isn't currently used.
+   A more declarative and modifiable accessor function. While it would almost
+   certainly be inlined, this is such a performance-critical operation that
+   this function isn't currently used.
 */
 func (kmer Kmer) Int() uint64 {
 	return *(*uint64)(unsafe.Pointer(&kmer))
 }
 
 /*
-   A more declarative and modifiable accessor function.
-   While it would almost certainly be inlined, this is such a performance-critical operation that this function isn't currently used.
+   A more declarative and modifiable accessor function. While it would almost
+   certainly be inlined, this is such a performance-critical operation that
+   this function isn't currently used.
 */
 func (kmer Kmer) ClassID() ClassID {
 	return *(*ClassID)(unsafe.Pointer(&kmer[8]))

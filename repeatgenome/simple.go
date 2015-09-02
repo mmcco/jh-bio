@@ -233,8 +233,7 @@ type ReadSAMRepeat struct {
 func (rg *RepeatGenome) MinClassifyRead(readSAM ReadSAM, minMap map[uint32]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
 	defer wg.Done()
 	read := readSAM.TextSeq
-	// the repeat we assign this read
-	// nil if we don't find one
+	// the repeat we assign this read nil if we don't find one
 	var repeat *Repeat
 	var numMins = len(read) - bioutils.M + 1
 MinLoop:
@@ -249,8 +248,8 @@ MinLoop:
 		if minRepeat, exists := minMap[minInt]; exists {
 			if repeat == nil {
 				repeat = minRepeat
-				// minRepeat is assumed to not be nil
-				// nils in minMap must therefore be deleted
+				// minRepeat is assumed to not be nil. nils in minMap must
+				// therefore be deleted.
 			} else if repeat != minRepeat {
 				repeat = nil
 				break
@@ -263,8 +262,7 @@ MinLoop:
 func (rg *RepeatGenome) KmerClassifyRead(readSAM ReadSAM, kmerMap map[uint64]*Repeat, wg *sync.WaitGroup, c chan ReadSAMRepeat) {
 	defer wg.Done()
 	read := readSAM.TextSeq
-	// the repeat we assign this read
-	// nil if we don't find one
+	// the repeat we assign this read nil if we don't find one
 	var repeat *Repeat
 	var numKmers = len(read) - bioutils.K + 1
 KmerLoop:
@@ -279,8 +277,8 @@ KmerLoop:
 		if kmerRepeat, exists := kmerMap[kmerInt]; exists {
 			if repeat == nil {
 				repeat = kmerRepeat
-				// kmerRepeat is assumed to not be nil
-				// nils in kmerMap must therefore be deleted
+				// kmerRepeat is assumed to not be nil. nils in kmerMap must
+				// therefore be deleted.
 			} else if repeat != kmerRepeat {
 				repeat = nil
 				break
@@ -295,8 +293,7 @@ func (rg *RepeatGenome) MinClassifyReadVerb(readSAM ReadSAM, minMap map[uint32]*
 	read := readSAM.TextSeq
 	fmt.Println(read)
 	fmt.Println()
-	// the repeat we assign this read
-	// nil if we don't find one
+	// the repeat we assign this read nil if we don't find one
 	var repeat *Repeat
 	var numMins = len(read) - bioutils.M + 1
 MinLoop:
@@ -314,8 +311,8 @@ MinLoop:
 				fmt.Println("recognized:")
 				fmt.Printf("\t%s\n", string(bioutils.U32ToBytes(minInt)))
 				fmt.Printf("\t\t%s\n", repeat.Name)
-				// minRepeat is assumed to not be nil
-				// nils in minMap must therefore be deleted
+				// minRepeat is assumed to not be nil. nils in minMap must
+				// therefore be deleted.
 			} else if repeat != minRepeat {
 				fmt.Println("conflict:")
 				fmt.Printf("\t%s\n", string(bioutils.U32ToBytes(minInt)))
@@ -347,8 +344,7 @@ func (rg *RepeatGenome) KmerClassifyReadVerb(readSAM ReadSAM, kmerMap map[uint64
 	read := readSAM.TextSeq
 	fmt.Println(read)
 	fmt.Println()
-	// the repeat we assign this read
-	// nil if we don't find one
+	// the repeat we assign this read nil if we don't find one
 	var repeat *Repeat
 	var numMins = len(read) - bioutils.K + 1
 MinLoop:
