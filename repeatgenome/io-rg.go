@@ -10,7 +10,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/plsql/jh-bio/bioutils"
+	"github.com/mmcco/jh-bio/bioutils"
 	"io"
 	"os"
 	"strconv"

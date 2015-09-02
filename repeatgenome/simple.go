@@ -2,7 +2,7 @@ package repeatgenome
 
 import (
 	"fmt"
-	"github.com/plsql/jh-bio/bioutils"
+	"github.com/mmcco/jh-bio/bioutils"
 	"sort"
 	"sync"
 )

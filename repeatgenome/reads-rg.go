@@ -7,7 +7,7 @@ package repeatgenome
 import (
 	"bytes"
 	"fmt"
-	"github.com/plsql/jh-bio/bioutils"
+	"github.com/mmcco/jh-bio/bioutils"
 	"os"
 	"sync"
 )
@@ -150,7 +150,7 @@ func (rg *RepeatGenome) GetClassChan(reads [][]byte, useLCA bool) chan ReadRespo
    A rather hairy function that classifies all reads in ./<genome-name>-reads/*.proc if any exist.
    .proc files are our own creation for ease of parsing and testing.
    They contain one lowercase read sequence per line, and nothing else.
-   We have a script that will convert FASTQ files to .proc files: github.com/plsql/bioinformatics/blob/master/scripts/format-FASTA-reads.py
+   We have a script that will convert FASTQ files to .proc files: github.com/mmcco/bioinformatics/blob/master/scripts/format-FASTA-reads.py
    This is generally really easy to do.
    However, we will used a FASTQ reader when we get past the initial testing phase.
    This could be done concurrently, considering how many disk accesses there are.

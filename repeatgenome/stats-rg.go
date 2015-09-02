@@ -6,7 +6,7 @@ package repeatgenome
 
 import (
 	"bytes"
-	"github.com/plsql/jh-bio/bioutils"
+	"github.com/mmcco/jh-bio/bioutils"
 	"unsafe"
 )
 
