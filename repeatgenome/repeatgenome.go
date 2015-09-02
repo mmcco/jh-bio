@@ -18,21 +18,27 @@ import (
 	"strings"
 )
 
-// minSliceSize is the size of a slice that contains an index for each possible
-// mMer.
+/*
+   minSliceSize is the size of a slice that contains an index for each possible
+   mMer.
+*/
 const minSliceSize uint64 = 1 << (2 * bioutils.M)
 
 var debug bool
 
-// This is used as a rudimentary way of determining how many goroutines to
-// spawn in concurrent sections.
+/*
+   This is used as a rudimentary way of determining how many goroutines to
+   spawn in concurrent sections.
+*/
 var numCPU = runtime.NumCPU()
 
 // Used to write heap memory profile.
 var memProfFile *os.File
 
-// A value of type Config is passed to the New() function, which constructs and
-// returns a new RepeatGenome.
+/*
+   A value of type Config is passed to the New() function, which constructs and
+   returns a new RepeatGenome.
+*/
 type Config struct {
 	Name       string
 	Debug      bool
@@ -80,9 +86,10 @@ type RepeatGenome struct {
 	ClassTree  ClassTree
 	Repeats    Repeats
 	RepeatMap  map[string]*Repeat
-	// Maps a Match to its associated ClassNode.
-	// Currently used in read classification logic.
-	// Not exposed in API.
+	/*
+	   Maps a Match to its associated ClassNode.
+	   Currently used in read classification logic.
+	*/
 	matchNodes map[*bioutils.Match]*ClassNode
 }
 
@@ -209,8 +216,10 @@ type Seq struct {
 
 type Seqs []Seq
 
-// A 2-dimensional map used to represent a newly-parsed FASTA-formatted
-// reference genome.
+/*
+   A 2-dimensional map used to represent a newly-parsed FASTA-formatted
+   reference genome.
+*/
 type Chroms map[string](map[string][]byte)
 
 func parseGenome(genomeName string) (error, Chroms) {
@@ -263,9 +272,11 @@ func New(config Config) (error, *RepeatGenome) {
 
 	runtime.GOMAXPROCS(numCPU)
 
-	// We populate the RepeatGenome mostly with helper functions. We should
-	// consider whether it makes more sense for them to alter the object
-	// directly, than to return their results.
+	/*
+	   We populate the RepeatGenome mostly with helper functions. We should
+	   consider whether it makes more sense for them to alter the object
+	   directly, than to return their results.
+	*/
 	rg := new(RepeatGenome)
 	rg.Name = config.Name
 
@@ -312,7 +323,8 @@ func New(config Config) (error, *RepeatGenome) {
 			if err != nil {
 				return fmt.Errorf("repeatgenome.New():" + err.Error()), nil
 			}
-		} else if os.IsNotExist(err) { // the case that there isn't a written file yet
+			// the case that there isn't a written file yet
+		} else if os.IsNotExist(err) {
 			fmt.Println("Kraken library file doesn't exist - generating library")
 			fmt.Println()
 			rg.genKrakenLibVerbose()
@@ -320,7 +332,8 @@ func New(config Config) (error, *RepeatGenome) {
 			if err != nil {
 				return err, nil
 			}
-		} else { // otherwise we're dealing with a generic error of some sort
+			// otherwise we're dealing with a generic error of some sort
+		} else {
 			return err, nil
 		}
 	}
@@ -345,17 +358,21 @@ func New(config Config) (error, *RepeatGenome) {
 }
 
 func (rg *RepeatGenome) getRepeats() {
-	// We now populate a list of unique repeat types. Repeats are stored in the
-	// below slice, indexed by their ID. We first determine the necessary size
-	// of the slice - we can't use append because matches are not sorted by
-	// repeatID.
+	/*
+	   We now populate a list of unique repeat types. Repeats are stored in the
+	   below slice, indexed by their ID. We first determine the necessary size
+	   of the slice - we can't use append because matches are not sorted by
+	   repeatID.
+	*/
 
 	rg.RepeatMap = make(map[string]*Repeat)
 
-	// DON'T use the second field of the range - this causes the Match struct
-	// to be copied. Creating an alias struct (match := rg.Matches[i]) of type
-	// Match rather than *Match causes the repeat.Instance item to point to a
-	// copy, not the original Match struct.
+	/*
+	   DON'T use the second field of the range - this causes the Match struct
+	   to be copied. Creating an alias struct (match := rg.Matches[i]) of type
+	   Match rather than *Match causes the repeat.Instance item to point to a
+	   copy, not the original Match struct.
+	*/
 	for i := range rg.Matches {
 		match := &rg.Matches[i]
 		// don't bother overwriting
@@ -376,8 +393,10 @@ func (rg *RepeatGenome) getRepeats() {
 }
 
 func (rg *RepeatGenome) getClassTree() {
-	// mapping to pointers allows us to make references (i.e. pointers) to
-	// values
+	/*
+	   Mapping to pointers allows us to make references (i.e. pointers) to
+	   values.
+	*/
 	tree := &rg.ClassTree
 	tree.ClassNodes = make(map[string](*ClassNode))
 	// would be prettier if expanded

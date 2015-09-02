@@ -133,10 +133,11 @@ func BytesToU32(seq []byte) uint32 {
 func Minimize(seq uint64) uint32 {
 	rcKmerInt := RevComp64(seq)
 	/*
-	   Despite being minimizers (and therefore expected to be
-	   uint32s), we make possMin and currMin KmerInts for ease of
-	   manipulation and then convert upon returning.
-	   Initialize the current best minimizer candidate as MAX_INT
+	   Despite being minimizers (and therefore expected to be uint32s), we make
+	   possMin and currMin KmerInts for ease of manipulation and then convert
+	   upon returning.
+
+	   The current best minimizer candidate is initialized as MAX_INT.
 	*/
 	currMin := ^uint64(0)
 	var possMin uint64
@@ -190,9 +191,8 @@ func U64ToBytes(kmerInt uint64) []byte {
 	var i uint8
 	for i = 0; i < K; i++ {
 		/*
-		   This tricky bit arithmetic shifts the two bits of interests
-		   to the two rightmost positions, then selects them with the
-		   and statement.
+		   This tricky bit arithmetic shifts the two bits of interests to the
+		   two rightmost positions, then selects them with the and statement.
 		*/
 		switch (kmerInt >> (2 * (K - i - 1))) & 3 {
 		case 0:
@@ -220,9 +220,8 @@ func U32ToBytes(minInt uint32) []byte {
 	var i uint8
 	for i = 0; i < M; i++ {
 		/*
-		   This tricky bit arithmetic shifts the two bits of interests
-		   to the two rightmost positions, then selects them with the
-		   and statement.
+		   This tricky bit arithmetic shifts the two bits of interests to the
+		   two rightmost positions, then selects them with the and statement.
 		*/
 		switch (minInt >> (2 * (M - i - 1))) & 3 {
 		case 0:

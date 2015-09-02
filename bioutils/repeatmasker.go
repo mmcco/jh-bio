@@ -231,6 +231,7 @@ func (match Match) Size() uint64 {
 	return match.SeqEnd - match.SeqStart
 }
 
+// Writes a representation of the Matches to the supplied filename.
 func (matches Matches) Write(filename string) error {
 	outfile, err := os.Create(filename)
 	if err != nil {
