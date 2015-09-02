@@ -1,13 +1,13 @@
 /*
-    Adapted from Ant Zucaro's matchr package:
-        https://github.com/antzucaro/matchr
+   Adapted from Ant Zucaro's matchr package:
+       https://github.com/antzucaro/matchr
 
-    matchr is GPLv2 licensed.
+   matchr is GPLv2 licensed.
 */
 package bioutils
 
 import (
-    "fmt"
+	"fmt"
 )
 
 const GAP_COST float64 = 0.5
@@ -36,16 +36,16 @@ func NeedlemanWunsch(a, b []byte) float64 {
 	}
 
 	for i := 0; i < len(a)+1; i++ {
-        d[i][0] = float64(-i) * GAP_COST
+		d[i][0] = float64(-i) * GAP_COST
 	}
 
 	for j := 0; j < len(b)+1; j++ {
-        d[0][j] = float64(-j) * GAP_COST
+		d[0][j] = float64(-j) * GAP_COST
 	}
 
 	for i := 1; i < len(a)+1; i++ {
 		for j := 1; j < len(b)+1; j++ {
-            cost := getCost(a, i-1, b, j-1)
+			cost := getCost(a, i-1, b, j-1)
 
 			// find the lowest cost
 			d[i][j] = maxF64(
@@ -54,11 +54,10 @@ func NeedlemanWunsch(a, b []byte) float64 {
 		}
 	}
 
-    printMatrix(d)
+	printMatrix(d)
 
 	return d[len(a)][len(b)]
 }
-
 
 func SmithWaterman(a, b []byte) float64 {
 
@@ -79,7 +78,7 @@ func SmithWaterman(a, b []byte) float64 {
 
 	for i := 1; i < len(a)+1; i++ {
 		for j := 1; j < len(b)+1; j++ {
-            cost := getCost(a, i-1, b, j-1)
+			cost := getCost(a, i-1, b, j-1)
 
 			// find the lowest cost
 			d[i][j] = maxF64(
@@ -93,20 +92,19 @@ func SmithWaterman(a, b []byte) float64 {
 		}
 	}
 
-    printMatrix(d)
+	printMatrix(d)
 
 	return maxSoFar
 }
 
-
 /*
-    Print matrix for debugging.
+   Print matrix for debugging.
 */
 func printMatrix(matrix [][]float64) {
-    for _, row := range matrix {
-        for _, score := range row {
-            fmt.Printf("%.1f  ", score)
-        }
-        fmt.Print("\n\n")
-    }
+	for _, row := range matrix {
+		for _, score := range row {
+			fmt.Printf("%.1f  ", score)
+		}
+		fmt.Print("\n\n")
+	}
 }

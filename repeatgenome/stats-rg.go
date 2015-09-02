@@ -5,29 +5,29 @@
 package repeatgenome
 
 import (
-    "bytes"
-    "github.com/plsql/jh-bio/bioutils"
-    "unsafe"
+	"bytes"
+	"github.com/plsql/jh-bio/bioutils"
+	"unsafe"
 )
 
 /*
    Returns the total number of bases in a RepeatGenome's reference chromosomes.
 */
 func (repeatGenome *RepeatGenome) Size() uint64 {
-    var numBases uint64 = 0
-    for _, seqs := range repeatGenome.chroms {
-        for _, seq := range seqs {
-            numBases += uint64(len(seq))
-        }
-    }
-    return numBases
+	var numBases uint64 = 0
+	for _, seqs := range repeatGenome.chroms {
+		for _, seq := range seqs {
+			numBases += uint64(len(seq))
+		}
+	}
+	return numBases
 }
 
 /*
    Returns the size in gigabytes of the supplied RepeatGenome's Kmers field.
 */
 func (rg *RepeatGenome) KmersGBSize() float64 {
-    return (float64(len(rg.Kmers)) / 1000000000) * float64(unsafe.Sizeof(Kmer{}))
+	return (float64(len(rg.Kmers)) / 1000000000) * float64(unsafe.Sizeof(Kmer{}))
 }
 
 /*
@@ -35,48 +35,48 @@ func (rg *RepeatGenome) KmersGBSize() float64 {
    It makes the assumption that no base is contained in more than one repeat instance.
 */
 func (rg *RepeatGenome) PercentRepeats() float64 {
-    var repeatBases uint64 = 0
-    for _, match := range rg.Matches {
-        repeatBases += match.SeqEnd - match.SeqStart
-    }
+	var repeatBases uint64 = 0
+	for _, match := range rg.Matches {
+		repeatBases += match.SeqEnd - match.SeqStart
+	}
 
-    return 100 * (float64(repeatBases) / float64(rg.Size()))
+	return 100 * (float64(repeatBases) / float64(rg.Size()))
 }
 
 /*
    Returns the sum of the sizes of all of a repeat sequence type's instances.
 */
 func (repeat *Repeat) Size() uint64 {
-    var repeatSize uint64 = 0
+	var repeatSize uint64 = 0
 
-    for _, match := range repeat.Instances {
-        repeatSize += match.SeqEnd - match.SeqStart
-    }
+	for _, match := range repeat.Instances {
+		repeatSize += match.SeqEnd - match.SeqStart
+	}
 
-    return repeatSize
+	return repeatSize
 }
 
 /*
    Returns the sum of the sizes of all repeat instances in the supplied ClassNode's subtree.
 */
 func (classNode *ClassNode) Size() uint64 {
-    if classNode == nil {
-        return 0
-    }
+	if classNode == nil {
+		return 0
+	}
 
-    var classNodeSize uint64 = 0
+	var classNodeSize uint64 = 0
 
-    if classNode.Repeat != nil {
-        for _, match := range classNode.Repeat.Instances {
-            classNodeSize += match.SeqEnd - match.SeqStart
-        }
-    }
+	if classNode.Repeat != nil {
+		for _, match := range classNode.Repeat.Instances {
+			classNodeSize += match.SeqEnd - match.SeqStart
+		}
+	}
 
-    for _, child := range classNode.Children {
-        classNodeSize += child.Size()
-    }
+	for _, child := range classNode.Children {
+		classNodeSize += child.Size()
+	}
 
-    return classNodeSize
+	return classNodeSize
 }
 
 /*
@@ -86,25 +86,25 @@ func (classNode *ClassNode) Size() uint64 {
    This function is used to calculate the probability of correct classification assuming random selection, and the amount to which a classification narrows a read's potential origin.
 */
 func (readResp ReadResponse) HangingSize() uint64 {
-    classNode := readResp.ClassNode
-    if classNode == nil {
-        return 0
-    }
+	classNode := readResp.ClassNode
+	if classNode == nil {
+		return 0
+	}
 
-    var classNodeSize uint64 = 0
+	var classNodeSize uint64 = 0
 
-    if classNode.Repeat != nil {
-        for _, match := range classNode.Repeat.Instances {
-            classNodeSize += match.SeqEnd - match.SeqStart
-            classNodeSize += 2 * uint64(len(readResp.Seq)-bioutils.K)
-        }
-    }
+	if classNode.Repeat != nil {
+		for _, match := range classNode.Repeat.Instances {
+			classNodeSize += match.SeqEnd - match.SeqStart
+			classNodeSize += 2 * uint64(len(readResp.Seq)-bioutils.K)
+		}
+	}
 
-    for _, child := range classNode.Children {
-        classNodeSize += ReadResponse{readResp.Seq, child}.HangingSize()
-    }
+	for _, child := range classNode.Children {
+		classNodeSize += ReadResponse{readResp.Seq, child}.HangingSize()
+	}
 
-    return classNodeSize
+	return classNodeSize
 }
 
 /*
@@ -114,26 +114,26 @@ func (readResp ReadResponse) HangingSize() uint64 {
    Uses a cumulative average to prevent overflow.
 */
 func (rg *RepeatGenome) AvgPossPercentGenome(resps []ReadResponse, strict bool) float64 {
-    classNodeSizes := make(map[*ClassNode]float64, len(rg.ClassTree.ClassNodes))
-    if strict {
-        for _, classNode := range rg.ClassTree.NodesByID {
-            classNodeSizes[classNode] = float64(classNode.Size())
-        }
-    } else {
-        for _, resp := range resps {
-            if _, exists := classNodeSizes[resp.ClassNode]; !exists {
-                classNodeSizes[resp.ClassNode] = float64(resp.HangingSize())
-            }
-        }
-    }
+	classNodeSizes := make(map[*ClassNode]float64, len(rg.ClassTree.ClassNodes))
+	if strict {
+		for _, classNode := range rg.ClassTree.NodesByID {
+			classNodeSizes[classNode] = float64(classNode.Size())
+		}
+	} else {
+		for _, resp := range resps {
+			if _, exists := classNodeSizes[resp.ClassNode]; !exists {
+				classNodeSizes[resp.ClassNode] = float64(resp.HangingSize())
+			}
+		}
+	}
 
-    var classesProcessed, avgClassSize float64 = 0, 0
-    for _, resp := range resps {
-        avgClassSize += (classNodeSizes[resp.ClassNode] - avgClassSize) / (classesProcessed + 1)
-        classesProcessed++
-    }
+	var classesProcessed, avgClassSize float64 = 0, 0
+	for _, resp := range resps {
+		avgClassSize += (classNodeSizes[resp.ClassNode] - avgClassSize) / (classesProcessed + 1)
+		classesProcessed++
+	}
 
-    return 100 * (avgClassSize / float64(rg.Size()))
+	return 100 * (avgClassSize / float64(rg.Size()))
 }
 
 /*
@@ -141,71 +141,71 @@ func (rg *RepeatGenome) AvgPossPercentGenome(resps []ReadResponse, strict bool) 
    It recursively determines whether a read originated from a reference repeat instance in the subtree indicated by the supplied ClassNode.
 */
 func (rg *RepeatGenome) recNodeSearch(classNode *ClassNode, readSAM ReadSAM, strict bool) bool {
-    if classNode != nil && classNode.Repeat != nil {
-        for _, match := range classNode.Repeat.Instances {
-            if match.SeqName != readSAM.SeqName {
-                continue
-            }
-            // must compute where the read ends
-            endInd := readSAM.StartInd + uint64(len(readSAM.TextSeq))
-            overlap := readSAM.SeqName == match.SeqName && readSAM.StartInd < match.SeqEnd && endInd > match.SeqStart
-            if overlap && !strict {
-                return true
-            } else if overlap && strict {
-                // below logic is for checking for at least rg.K overlap
-                var overlap uint64 = endInd - match.SeqStart
-                if readSAM.StartInd > match.SeqStart {
-                    overlap -= readSAM.StartInd - match.SeqStart
-                }
-                if overlap >= bioutils.K {
-                    return true
-                }
-            }
-        }
-    }
-    if classNode != nil && classNode.Children != nil {
-        for _, child := range classNode.Children {
-            if rg.recNodeSearch(child, readSAM, strict) {
-                return true
-            }
-        }
-    }
-    return false
+	if classNode != nil && classNode.Repeat != nil {
+		for _, match := range classNode.Repeat.Instances {
+			if match.SeqName != readSAM.SeqName {
+				continue
+			}
+			// must compute where the read ends
+			endInd := readSAM.StartInd + uint64(len(readSAM.TextSeq))
+			overlap := readSAM.SeqName == match.SeqName && readSAM.StartInd < match.SeqEnd && endInd > match.SeqStart
+			if overlap && !strict {
+				return true
+			} else if overlap && strict {
+				// below logic is for checking for at least rg.K overlap
+				var overlap uint64 = endInd - match.SeqStart
+				if readSAM.StartInd > match.SeqStart {
+					overlap -= readSAM.StartInd - match.SeqStart
+				}
+				if overlap >= bioutils.K {
+					return true
+				}
+			}
+		}
+	}
+	if classNode != nil && classNode.Children != nil {
+		for _, child := range classNode.Children {
+			if rg.recNodeSearch(child, readSAM, strict) {
+				return true
+			}
+		}
+	}
+	return false
 }
-
 
 func (rg *RepeatGenome) RepeatIsCorrect(readSAMRepeat ReadSAMRepeat, strict bool) bool {
-    // awkward unpacking - maybe use separate args?
-    readSAM, repeat := readSAMRepeat.ReadSAM, readSAMRepeat.Repeat
-    read, seqName, startInd := readSAM.TextSeq, readSAM.SeqName, readSAM.StartInd
-    if repeat == nil {
-        // We will for now use a panic rather than an error.
-        // This is for speed and simplicity, and because the caller
-        // logically should ensure than the repeat is non-nil.
-        panic("RepeatGenome.RepeatIsCorrect(): readSAMRepeat.Repeat is nil")
-    }
-    for _, match := range repeat.Instances {
-        if match.SeqName != seqName {
-            continue
-        }
-        // must compute where the read ends - it isn't stored
-        endInd := readSAM.StartInd + uint64(len(read))
-        overlap := seqName == match.SeqName && startInd < match.SeqEnd && endInd > match.SeqStart
-        if overlap && !strict {
-            return true
-        } else if overlap && strict {
-            // below logic is for checking for at least rg.K overlap
-            var overlap uint64 = endInd - match.SeqStart
-            if startInd > match.SeqStart {
-                overlap -= startInd - match.SeqStart
-            }
-            if overlap >= bioutils.K {
-                return true
-            }
-        }
-    }
-    return false
+	// awkward unpacking - maybe use separate args?
+	readSAM, repeat := readSAMRepeat.ReadSAM, readSAMRepeat.Repeat
+	read, seqName, startInd := readSAM.TextSeq, readSAM.SeqName, readSAM.StartInd
+	if repeat == nil {
+		// We will for now use a panic rather than an error.
+		// This is for speed and simplicity, and because the caller
+		// logically should ensure than the repeat is non-nil.
+		panic("RepeatGenome.RepeatIsCorrect(): readSAMRepeat.Repeat is nil")
+	}
+	for _, match := range repeat.Instances {
+		if match.SeqName != seqName {
+			continue
+		}
+		// must compute where the read ends - it isn't stored
+		endInd := readSAM.StartInd + uint64(len(read))
+		overlap := seqName == match.SeqName && startInd < match.SeqEnd && endInd > match.SeqStart
+		if overlap && !strict {
+			return true
+		} else if overlap && strict {
+			// below logic is for checking for at least rg.K overlap
+			var overlap uint64 = endInd - match.SeqStart
+			if startInd > match.SeqStart {
+				overlap -= startInd - match.SeqStart
+			}
+			if overlap >= bioutils.K {
+				return true
+			}
+		}
+	}
+	return false
 }
+
 /*
 func TestNodeSearch(classNode *ClassNode, readSAM ReadSAM) bool {
     if classNode == nil {
@@ -257,17 +257,17 @@ func TestNodeSearch(classNode *ClassNode, readSAM ReadSAM) bool {
    Otherwise, the read must overlap a reference repeat instance by at least k bases.
 */
 func (rg *RepeatGenome) PercentTrueClassifications(responses []ReadSAMResponse, useStrict bool) float64 {
-    var classifications, correctClassifications uint64 = 0, 0
+	var classifications, correctClassifications uint64 = 0, 0
 
-    for _, resp := range responses {
-        if resp.ClassNode != nil {
-            classifications++
-        }
-        if rg.recNodeSearch(resp.ClassNode, resp.ReadSAM, useStrict) {
-            correctClassifications++
-        }
-    }
-    return 100 * (float64(correctClassifications) / float64(classifications))
+	for _, resp := range responses {
+		if resp.ClassNode != nil {
+			classifications++
+		}
+		if rg.recNodeSearch(resp.ClassNode, resp.ReadSAM, useStrict) {
+			correctClassifications++
+		}
+	}
+	return 100 * (float64(correctClassifications) / float64(classifications))
 }
 
 /*
@@ -276,19 +276,19 @@ func (rg *RepeatGenome) PercentTrueClassifications(responses []ReadSAMResponse, 
    This is different from the count returned by krakenFirstPass() because it does not allow ambiguous kmers.
 */
 func (rg *RepeatGenome) numRawKmers() uint64 {
-    var numRawKmers uint64 = 0
+	var numRawKmers uint64 = 0
 
-    splitOnN := func(c rune) bool { return c == 'n' }
+	splitOnN := func(c rune) bool { return c == 'n' }
 
-    for i := range rg.Matches {
-        match := &rg.Matches[i]
-        seq := rg.chroms[match.SeqName][match.SeqName][match.SeqStart:match.SeqEnd]
-        seqs := bytes.FieldsFunc([]byte(seq), splitOnN)
-        for j := range seqs {
-            if len(seqs[j]) >= bioutils.K {
-                numRawKmers += uint64(len(seqs[j]) - bioutils.K + 1)
-            }
-        }
-    }
-    return numRawKmers
+	for i := range rg.Matches {
+		match := &rg.Matches[i]
+		seq := rg.chroms[match.SeqName][match.SeqName][match.SeqStart:match.SeqEnd]
+		seqs := bytes.FieldsFunc([]byte(seq), splitOnN)
+		for j := range seqs {
+			if len(seqs[j]) >= bioutils.K {
+				numRawKmers += uint64(len(seqs[j]) - bioutils.K + 1)
+			}
+		}
+	}
+	return numRawKmers
 }

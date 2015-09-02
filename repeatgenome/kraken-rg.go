@@ -5,12 +5,12 @@
 package repeatgenome
 
 import (
-    "fmt"
-    "github.com/plsql/jh-bio/bioutils"
-    "runtime"
-    "sort"
-    "sync"
-    "unsafe"
+	"fmt"
+	"github.com/plsql/jh-bio/bioutils"
+	"runtime"
+	"sort"
+	"sync"
+	"unsafe"
 )
 
 /*
@@ -19,14 +19,14 @@ import (
    This is a performance-critical function, and a location for potential optimization.
 */
 func (classTree *ClassTree) getLCA(cnA, cnB *ClassNode) *ClassNode {
-    for cnBWalker := cnB; cnBWalker != classTree.Root; cnBWalker = cnBWalker.Parent {
-        for cnAWalker := cnA; cnAWalker != classTree.Root; cnAWalker = cnAWalker.Parent {
-            if cnBWalker == cnAWalker {
-                return cnBWalker
-            }
-        }
-    }
-    return classTree.Root
+	for cnBWalker := cnB; cnBWalker != classTree.Root; cnBWalker = cnBWalker.Parent {
+		for cnAWalker := cnA; cnAWalker != classTree.Root; cnAWalker = cnAWalker.Parent {
+			if cnBWalker == cnAWalker {
+				return cnBWalker
+			}
+		}
+	}
+	return classTree.Root
 }
 
 /*
@@ -34,61 +34,61 @@ func (classTree *ClassTree) getLCA(cnA, cnB *ClassNode) *ClassNode {
    Part of the core Kraken read-classification functionality.
 */
 func (rg *RepeatGenome) getKmerLCA(kmerInt uint64) *ClassNode {
-    minimizer := bioutils.Minimize(kmerInt)
+	minimizer := bioutils.Minimize(kmerInt)
 
-    // simple binary search within the range of RepeatGenome.Kmers that has this kmer's minimizer
-    i := rg.MinOffsets[minimizer]
-    if i < 0 {
-        return nil
-    }
-    j := i + int64(rg.MinCounts[minimizer])
-    for i < j {
-        x := (j + i) / 2
-        thisKmerInt := rg.Kmers[x].Int()
-        if thisKmerInt == kmerInt {
-            return rg.ClassTree.NodesByID[rg.Kmers[x].ClassID()] // get kmer's LCA ID and return the corresponding ClassNode
-        } else if thisKmerInt < kmerInt {
-            i = x + 1
-        } else {
-            j = x
-        }
-    }
+	// simple binary search within the range of RepeatGenome.Kmers that has this kmer's minimizer
+	i := rg.MinOffsets[minimizer]
+	if i < 0 {
+		return nil
+	}
+	j := i + int64(rg.MinCounts[minimizer])
+	for i < j {
+		x := (j + i) / 2
+		thisKmerInt := rg.Kmers[x].Int()
+		if thisKmerInt == kmerInt {
+			return rg.ClassTree.NodesByID[rg.Kmers[x].ClassID()] // get kmer's LCA ID and return the corresponding ClassNode
+		} else if thisKmerInt < kmerInt {
+			i = x + 1
+		} else {
+			j = x
+		}
+	}
 
-    return nil
+	return nil
 }
 
 /*
    Pushes all minimizers of all kmers of each Match in the supplied slice to the supplied chan.
 */
 func (rg *RepeatGenome) getRawMins(matchChan chan *bioutils.Match, respChan chan uint32, wg *sync.WaitGroup) {
-    for match := range matchChan {
-        start, end := match.SeqStart, match.SeqEnd
-        matchSeq := rg.chroms[match.SeqName][match.SeqName][start:end]
+	for match := range matchChan {
+		start, end := match.SeqStart, match.SeqEnd
+		matchSeq := rg.chroms[match.SeqName][match.SeqName][start:end]
 
-        if len(matchSeq) < bioutils.K {
-            continue
-        }
-        // includes kmers containing n's, which are ignored
-        numKmers := end - start - bioutils.K + 1
+		if len(matchSeq) < bioutils.K {
+			continue
+		}
+		// includes kmers containing n's, which are ignored
+		numKmers := end - start - bioutils.K + 1
 
-        var i uint64
-    KmerLoop:
-        for i = 0; i < numKmers; i++ {
+		var i uint64
+	KmerLoop:
+		for i = 0; i < numKmers; i++ {
 
-            var j int64
-            for j = bioutils.K - 1; j >= 0; j-- {
-                if matchSeq[i+uint64(j)] == 'n' {
-                    i += uint64(j)
-                    continue KmerLoop
-                }
-            }
+			var j int64
+			for j = bioutils.K - 1; j >= 0; j-- {
+				if matchSeq[i+uint64(j)] == 'n' {
+					i += uint64(j)
+					continue KmerLoop
+				}
+			}
 
-            seq := matchSeq[i : i+bioutils.K]
-            kmerInt := bioutils.BytesToU64(seq)
-            respChan <- bioutils.Minimize(kmerInt)
-        }
-    }
-    wg.Done()
+			seq := matchSeq[i : i+bioutils.K]
+			kmerInt := bioutils.BytesToU64(seq)
+			respChan <- bioutils.Minimize(kmerInt)
+		}
+	}
+	wg.Done()
 }
 
 /*
@@ -98,8 +98,8 @@ func (rg *RepeatGenome) getRawMins(matchChan chan *bioutils.Match, respChan chan
    of the Kmer came from.
 */
 type ResponsePair struct {
-    Kmer   Kmer
-    MinInt uint32
+	Kmer   Kmer
+	MinInt uint32
 }
 
 /*
@@ -109,38 +109,38 @@ type ResponsePair struct {
    of the match processed, not the Kmer's final LCA ID.
 */
 func (rg *RepeatGenome) getMatchKmers(matchChan chan *bioutils.Match, respChan chan ResponsePair, wg *sync.WaitGroup) {
-    for match := range matchChan {
-        start, end := match.SeqStart, match.SeqEnd
-        matchSeq := rg.chroms[match.SeqName][match.SeqName][start:end]
+	for match := range matchChan {
+		start, end := match.SeqStart, match.SeqEnd
+		matchSeq := rg.chroms[match.SeqName][match.SeqName][start:end]
 
-        if len(matchSeq) < bioutils.K {
-            continue
-        }
-        // includes kmers containing n's, which are ignored
-        numRawKmers := end - start - bioutils.K + 1
+		if len(matchSeq) < bioutils.K {
+			continue
+		}
+		// includes kmers containing n's, which are ignored
+		numRawKmers := end - start - bioutils.K + 1
 
-        var i uint64
-    KmerLoop:
-        for i = 0; i < numRawKmers; i++ {
+		var i uint64
+	KmerLoop:
+		for i = 0; i < numRawKmers; i++ {
 
-            var j int64
-            for j = int64(bioutils.K) - 1; j >= 0; j-- {
-                if matchSeq[i+uint64(j)] == 'n' {
-                    i += uint64(j)
-                    continue KmerLoop
-                }
-            }
+			var j int64
+			for j = int64(bioutils.K) - 1; j >= 0; j-- {
+				if matchSeq[i+uint64(j)] == 'n' {
+					i += uint64(j)
+					continue KmerLoop
+				}
+			}
 
-            seq := matchSeq[i : i+bioutils.K]
-            rawInt := bioutils.BytesToU64(seq)
-            kmerInt := bioutils.CanonicalRepr64(rawInt)
-            var kmer Kmer
-            (&kmer).SetInt(kmerInt)
-            (&kmer).SetClassID(rg.matchNodes[match].ID)
-            respChan <- ResponsePair{kmer, bioutils.Minimize(kmerInt)}
-        }
-    }
-    wg.Done()
+			seq := matchSeq[i : i+bioutils.K]
+			rawInt := bioutils.BytesToU64(seq)
+			kmerInt := bioutils.CanonicalRepr64(rawInt)
+			var kmer Kmer
+			(&kmer).SetInt(kmerInt)
+			(&kmer).SetClassID(rg.matchNodes[match].ID)
+			respChan <- ResponsePair{kmer, bioutils.Minimize(kmerInt)}
+		}
+	}
+	wg.Done()
 }
 
 /*
@@ -152,39 +152,39 @@ func (rg *RepeatGenome) getMatchKmers(matchChan chan *bioutils.Match, respChan c
    the number of times each minimizer appears in the genome.
 */
 func (rg *RepeatGenome) krakenFirstPass() (numRawKmers uint64, numRawMins uint64, rawMinCounts []uint32) {
-    matchChan := make(chan *bioutils.Match)
-    go func() {
-        for i := range rg.Matches {
-            matchChan <- &rg.Matches[i]
-        }
-        close(matchChan)
-    }()
+	matchChan := make(chan *bioutils.Match)
+	go func() {
+		for i := range rg.Matches {
+			matchChan <- &rg.Matches[i]
+		}
+		close(matchChan)
+	}()
 
-    wg := new(sync.WaitGroup)
-    wg.Add(numCPU)
-    respChan := make(chan uint32) // cannot buffer without additional WaitGroup
+	wg := new(sync.WaitGroup)
+	wg.Add(numCPU)
+	respChan := make(chan uint32) // cannot buffer without additional WaitGroup
 
-    go func() {
-        wg.Wait()
-        close(respChan)
-    }()
+	go func() {
+		wg.Wait()
+		close(respChan)
+	}()
 
-    for i := 0; i < numCPU; i++ {
-        go rg.getRawMins(matchChan, respChan, wg)
-    }
+	for i := 0; i < numCPU; i++ {
+		go rg.getRawMins(matchChan, respChan, wg)
+	}
 
-    rawMinCounts = make([]uint32, minSliceSize, minSliceSize)
-    for minInt := range respChan {
-        if rawMinCounts[minInt] == 0 {
-            numRawMins++
-        }
-        rawMinCounts[minInt]++
-        numRawKmers++
-    }
+	rawMinCounts = make([]uint32, minSliceSize, minSliceSize)
+	for minInt := range respChan {
+		if rawMinCounts[minInt] == 0 {
+			numRawMins++
+		}
+		rawMinCounts[minInt]++
+		numRawKmers++
+	}
 
-    wg.Wait()
+	wg.Wait()
 
-    return numRawKmers, numRawMins, rawMinCounts
+	return numRawKmers, numRawMins, rawMinCounts
 }
 
 /*
@@ -194,85 +194,85 @@ func (rg *RepeatGenome) krakenFirstPass() (numRawKmers uint64, numRawMins uint64
    sort each minimizer's kmers as a unique slice.
 */
 func (rg *RepeatGenome) sortRawKmers(rawKmers Kmers, rawMinCounts []uint32) {
-    wg := new(sync.WaitGroup)
-    wg.Add(numCPU)
-    kmersChan := make(chan Kmers)
-    for i := 0; i < numCPU; i++ {
-        go func() {
-            for kmers := range kmersChan {
-                sort.Sort(kmers)
-                /*
-                   // a simple insertion sort, which is faster than sort.Sort's QuickSort for such small lists
-                   for i := 1; i < len(kmers); i++ {
-                       for j := i; j > 0 && kmers.Less(j, j-1); j-- {
-                           kmers.Swap(j, j-1)
-                       }
-                   }
-                */
-            }
-            wg.Done()
-        }()
-    }
+	wg := new(sync.WaitGroup)
+	wg.Add(numCPU)
+	kmersChan := make(chan Kmers)
+	for i := 0; i < numCPU; i++ {
+		go func() {
+			for kmers := range kmersChan {
+				sort.Sort(kmers)
+				/*
+				   // a simple insertion sort, which is faster than sort.Sort's QuickSort for such small lists
+				   for i := 1; i < len(kmers); i++ {
+				       for j := i; j > 0 && kmers.Less(j, j-1); j-- {
+				           kmers.Swap(j, j-1)
+				       }
+				   }
+				*/
+			}
+			wg.Done()
+		}()
+	}
 
-    var start, end uint64 = 0, 0
-    for _, minInt := range rg.SortedMins {
-        end += uint64(rawMinCounts[minInt])
-        kmersChan <- rawKmers[start:end]
-        start = end
-    }
+	var start, end uint64 = 0, 0
+	for _, minInt := range rg.SortedMins {
+		end += uint64(rawMinCounts[minInt])
+		kmersChan <- rawKmers[start:end]
+		start = end
+	}
 
-    close(kmersChan)
-    wg.Wait()
+	close(kmersChan)
+	wg.Wait()
 }
 
 func (rg *RepeatGenome) genSimpleMap() map[uint64]ClassID {
-    kmerClasses := make(map[uint64]ClassID)
-    for respPair := range rg.respPairChan() {
-        kmerInt, classID := respPair.Kmer.Int(), respPair.Kmer.ClassID()
-        prevClassID, exists := kmerClasses[kmerInt]
-        // Assumes that prevClassID will never be 0.
-        // An existing 0 implies that the kmer is already know to be
-        // associated with multiple classes (useless, in this context.
-        if !exists {
-            kmerClasses[kmerInt] = classID
-        } else if prevClassID != classID {
-            kmerClasses[kmerInt] = 0
-        }
-    }
+	kmerClasses := make(map[uint64]ClassID)
+	for respPair := range rg.respPairChan() {
+		kmerInt, classID := respPair.Kmer.Int(), respPair.Kmer.ClassID()
+		prevClassID, exists := kmerClasses[kmerInt]
+		// Assumes that prevClassID will never be 0.
+		// An existing 0 implies that the kmer is already know to be
+		// associated with multiple classes (useless, in this context.
+		if !exists {
+			kmerClasses[kmerInt] = classID
+		} else if prevClassID != classID {
+			kmerClasses[kmerInt] = 0
+		}
+	}
 
-    // remove kmers appearing in multiple classes
-    for kmerInt, classID := range kmerClasses {
-        if classID == 0 {
-            delete(kmerClasses, kmerInt)
-        }
-    }
+	// remove kmers appearing in multiple classes
+	for kmerInt, classID := range kmerClasses {
+		if classID == 0 {
+			delete(kmerClasses, kmerInt)
+		}
+	}
 
-    return kmerClasses
+	return kmerClasses
 }
 
 func (rg *RepeatGenome) respPairChan() chan ResponsePair {
-    matchChan := make(chan *bioutils.Match, 500)
-    go func() {
-        for i := range rg.Matches {
-            matchChan <- &rg.Matches[i]
-        }
-        close(matchChan)
-    }()
+	matchChan := make(chan *bioutils.Match, 500)
+	go func() {
+		for i := range rg.Matches {
+			matchChan <- &rg.Matches[i]
+		}
+		close(matchChan)
+	}()
 
-    var wg = new(sync.WaitGroup)
-    wg.Add(numCPU)
-    respChan := make(chan ResponsePair) // do not buffer without additional WaitGroup
+	var wg = new(sync.WaitGroup)
+	wg.Add(numCPU)
+	respChan := make(chan ResponsePair) // do not buffer without additional WaitGroup
 
-    go func() {
-        wg.Wait()
-        close(respChan)
-    }()
+	go func() {
+		wg.Wait()
+		close(respChan)
+	}()
 
-    for i := 0; i < numCPU; i++ {
-        go rg.getMatchKmers(matchChan, respChan, wg)
-    }
+	for i := 0; i < numCPU; i++ {
+		go rg.getMatchKmers(matchChan, respChan, wg)
+	}
 
-    return respChan
+	return respChan
 }
 
 /*
@@ -280,190 +280,190 @@ func (rg *RepeatGenome) respPairChan() chan ResponsePair {
    unsorted and non-unique.
 */
 func (rg *RepeatGenome) getRawKmers(numRawKmers uint64, rawMinCounts []uint32) Kmers {
-    // we need a map telling us the next place to insert a kmer associated with any given minimizer
-    // we simply increment a minimizer's offset when we insert a kmer associated with it
-    locMap := make([]int64, minSliceSize, minSliceSize)
+	// we need a map telling us the next place to insert a kmer associated with any given minimizer
+	// we simply increment a minimizer's offset when we insert a kmer associated with it
+	locMap := make([]int64, minSliceSize, minSliceSize)
 
-    for i := 1; i < len(rg.SortedMins); i++ {
-        thisMin := rg.SortedMins[i]
-        lastMin := rg.SortedMins[i-1]
-        locMap[thisMin] = locMap[lastMin] + int64(rawMinCounts[lastMin])
-    }
-    // could set all unoccupied locMap indices to -1 here for debugging
+	for i := 1; i < len(rg.SortedMins); i++ {
+		thisMin := rg.SortedMins[i]
+		lastMin := rg.SortedMins[i-1]
+		locMap[thisMin] = locMap[lastMin] + int64(rawMinCounts[lastMin])
+	}
+	// could set all unoccupied locMap indices to -1 here for debugging
 
-    // the code in respPairChan() used to be inline here
-    respChan := rg.respPairChan()
+	// the code in respPairChan() used to be inline here
+	respChan := rg.respPairChan()
 
-    // we now populate the raw kmers list, filing each according to its minimizer
-    rawKmers := make(Kmers, numRawKmers)
-    for respPair := range respChan {
-        rawKmers[locMap[respPair.MinInt]] = respPair.Kmer
-        locMap[respPair.MinInt]++
-    }
+	// we now populate the raw kmers list, filing each according to its minimizer
+	rawKmers := make(Kmers, numRawKmers)
+	for respPair := range respChan {
+		rawKmers[locMap[respPair.MinInt]] = respPair.Kmer
+		locMap[respPair.MinInt]++
+	}
 
-    return rawKmers
+	return rawKmers
 }
 
 type ReducePair struct {
-    LcaPtr *ClassID
-    Set    Kmers
+	LcaPtr *ClassID
+	Set    Kmers
 }
 
 func (rg *RepeatGenome) uniqKmers(rawKmers Kmers) {
-    // we first count the uniques so that we don't waste any capacity
-    // in the rg.Kmers slice
-    var numUniqs uint64 = 0
-    if len(rawKmers) > 0 {
-        numUniqs++ // account for the first one, which is skipped
-        for i := 1; i < len(rawKmers); i++ {
-            lastKmerInt := rawKmers[i-1].Int()
-            kmerInt := rawKmers[i].Int()
-            if kmerInt != lastKmerInt {
-                numUniqs++
-            }
-        }
-    }
+	// we first count the uniques so that we don't waste any capacity
+	// in the rg.Kmers slice
+	var numUniqs uint64 = 0
+	if len(rawKmers) > 0 {
+		numUniqs++ // account for the first one, which is skipped
+		for i := 1; i < len(rawKmers); i++ {
+			lastKmerInt := rawKmers[i-1].Int()
+			kmerInt := rawKmers[i].Int()
+			if kmerInt != lastKmerInt {
+				numUniqs++
+			}
+		}
+	}
 
-    rg.Kmers = make(Kmers, 0, numUniqs)
+	rg.Kmers = make(Kmers, 0, numUniqs)
 
-    pairChan := make(chan ReducePair)
-    var wg = new(sync.WaitGroup)
-    wg.Add(numCPU)
+	pairChan := make(chan ReducePair)
+	var wg = new(sync.WaitGroup)
+	wg.Add(numCPU)
 
-    go func() {
-        wg.Wait()
-        close(pairChan)
-    }()
+	go func() {
+		wg.Wait()
+		close(pairChan)
+	}()
 
-    for i := 0; i < numCPU; i++ {
-        // this function finds the LCA of a set of kmers and updates
-        // the supplied ClassID pointer accordingly
-        go func() {
-            for pair := range pairChan {
-                // grab the LCA of the first kmer in this set, and use
-                // it as our starting point
-                classID := pair.Set[0].ClassID()
-                currLCA := rg.ClassTree.NodesByID[classID]
+	for i := 0; i < numCPU; i++ {
+		// this function finds the LCA of a set of kmers and updates
+		// the supplied ClassID pointer accordingly
+		go func() {
+			for pair := range pairChan {
+				// grab the LCA of the first kmer in this set, and use
+				// it as our starting point
+				classID := pair.Set[0].ClassID()
+				currLCA := rg.ClassTree.NodesByID[classID]
 
-                // loop through the rest, updating currLCA
-                for i := 1; i < len(pair.Set); i++ {
-                    classID = pair.Set[i].ClassID()
-                    currLCA = rg.ClassTree.getLCA(currLCA, rg.ClassTree.NodesByID[classID])
-                }
+				// loop through the rest, updating currLCA
+				for i := 1; i < len(pair.Set); i++ {
+					classID = pair.Set[i].ClassID()
+					currLCA = rg.ClassTree.getLCA(currLCA, rg.ClassTree.NodesByID[classID])
+				}
 
-                *pair.LcaPtr = currLCA.ID
-            }
-            wg.Done()
-        }()
-    }
+				*pair.LcaPtr = currLCA.ID
+			}
+			wg.Done()
+		}()
+	}
 
-    numKmers := uint64(len(rawKmers))
-    var start, end uint64 = 0, 0
-    for end < numKmers {
-        start = end
-        end++
-        for end < numKmers && rawKmers[end-1].Int() == rawKmers[end].Int() {
-            end++
-        }
-        rg.Kmers = append(rg.Kmers, rawKmers[start])
-        classPtr := (*ClassID)(unsafe.Pointer(&rg.Kmers[len(rg.Kmers)-1][8]))
-        pairChan <- ReducePair{classPtr, rawKmers[start:end]}
-    }
+	numKmers := uint64(len(rawKmers))
+	var start, end uint64 = 0, 0
+	for end < numKmers {
+		start = end
+		end++
+		for end < numKmers && rawKmers[end-1].Int() == rawKmers[end].Int() {
+			end++
+		}
+		rg.Kmers = append(rg.Kmers, rawKmers[start])
+		classPtr := (*ClassID)(unsafe.Pointer(&rg.Kmers[len(rg.Kmers)-1][8]))
+		pairChan <- ReducePair{classPtr, rawKmers[start:end]}
+	}
 
 }
 
 /*
-    Be sure to mirror all changes in verbose version below.
+   Be sure to mirror all changes in verbose version below.
 */
 func (rg *RepeatGenome) genKrakenLib() {
 
-    numRawKmers, numRawMins, rawMinCounts := rg.krakenFirstPass()
-    rg.SortedMins = make(MinInts, 0, numRawMins)
-    for minInt, cnt := range rawMinCounts {
-        if cnt > 0 {
-            rg.SortedMins = append(rg.SortedMins, uint32(minInt))
-        }
-    }
-    sort.Sort(rg.SortedMins)
-    rawKmers := rg.getRawKmers(numRawKmers, rawMinCounts)
-    runtime.GC() // manual memory clear
+	numRawKmers, numRawMins, rawMinCounts := rg.krakenFirstPass()
+	rg.SortedMins = make(MinInts, 0, numRawMins)
+	for minInt, cnt := range rawMinCounts {
+		if cnt > 0 {
+			rg.SortedMins = append(rg.SortedMins, uint32(minInt))
+		}
+	}
+	sort.Sort(rg.SortedMins)
+	rawKmers := rg.getRawKmers(numRawKmers, rawMinCounts)
+	runtime.GC() // manual memory clear
 
-    if debug {
-        rawKmers.checkIntegrity()
-    }
+	if debug {
+		rawKmers.checkIntegrity()
+	}
 
-    rg.sortRawKmers(rawKmers, rawMinCounts)
-    rg.uniqKmers(rawKmers)
-    rawKmers = nil
-    runtime.GC()
+	rg.sortRawKmers(rawKmers, rawMinCounts)
+	rg.uniqKmers(rawKmers)
+	rawKmers = nil
+	runtime.GC()
 
-    rg.MinCounts = make([]uint32, minSliceSize, minSliceSize)
-    for _, kmer := range rg.Kmers {
-        min := bioutils.Minimize(kmer.Int())
-        rg.MinCounts[min]++
-    }
-    rg.populateMinOffsets()
+	rg.MinCounts = make([]uint32, minSliceSize, minSliceSize)
+	for _, kmer := range rg.Kmers {
+		min := bioutils.Minimize(kmer.Int())
+		rg.MinCounts[min]++
+	}
+	rg.populateMinOffsets()
 }
 
 func (rg *RepeatGenome) genKrakenLibVerbose() {
 
-    fmt.Println()
-    fmt.Println("beginning first pass")
-    numRawKmers, numRawMins, rawMinCounts := rg.krakenFirstPass()
-    fmt.Println("first pass complete")
+	fmt.Println()
+	fmt.Println("beginning first pass")
+	numRawKmers, numRawMins, rawMinCounts := rg.krakenFirstPass()
+	fmt.Println("first pass complete")
 
-    fmt.Println("expecting", comma(int(numRawMins)), "unique minimizers")
-    fmt.Println("expecting", comma(int(numRawKmers)), "non-unique kmers")
+	fmt.Println("expecting", comma(int(numRawMins)), "unique minimizers")
+	fmt.Println("expecting", comma(int(numRawKmers)), "non-unique kmers")
 
-    // populate a list of sorted minimizers
-    fmt.Println()
-    fmt.Println("generating RepeatGenome.SortedMins")
-    rg.SortedMins = make(MinInts, 0, numRawMins)
-    for minInt, cnt := range rawMinCounts {
-        if cnt > 0 {
-            rg.SortedMins = append(rg.SortedMins, uint32(minInt))
-        }
-    }
-    fmt.Println("RepeatGenome.SortedMins generated")
-    fmt.Println()
-    fmt.Println("Beginning sorting RepeatGenome.SortedMins")
-    sort.Sort(rg.SortedMins)
-    fmt.Println("RepeatGenome.SortedMins sorted")
-    fmt.Println("len(rg.SortedMins):", comma(len(rg.SortedMins)))
+	// populate a list of sorted minimizers
+	fmt.Println()
+	fmt.Println("generating RepeatGenome.SortedMins")
+	rg.SortedMins = make(MinInts, 0, numRawMins)
+	for minInt, cnt := range rawMinCounts {
+		if cnt > 0 {
+			rg.SortedMins = append(rg.SortedMins, uint32(minInt))
+		}
+	}
+	fmt.Println("RepeatGenome.SortedMins generated")
+	fmt.Println()
+	fmt.Println("Beginning sorting RepeatGenome.SortedMins")
+	sort.Sort(rg.SortedMins)
+	fmt.Println("RepeatGenome.SortedMins sorted")
+	fmt.Println("len(rg.SortedMins):", comma(len(rg.SortedMins)))
 
-    fmt.Println()
-    fmt.Println("generating rawKmers and locMap")
-    rawKmers := rg.getRawKmers(numRawKmers, rawMinCounts)
-    runtime.GC() // manual memory clear
-    fmt.Println("raw kmers slice generated")
-    fmt.Println("len(rawKmers) =", comma(len(rawKmers)))
+	fmt.Println()
+	fmt.Println("generating rawKmers and locMap")
+	rawKmers := rg.getRawKmers(numRawKmers, rawMinCounts)
+	runtime.GC() // manual memory clear
+	fmt.Println("raw kmers slice generated")
+	fmt.Println("len(rawKmers) =", comma(len(rawKmers)))
 
-    if debug {
-        rawKmers.checkIntegrity()
-    }
+	if debug {
+		rawKmers.checkIntegrity()
+	}
 
-    fmt.Println("sorting rawKmers")
-    rg.sortRawKmers(rawKmers, rawMinCounts)
-    fmt.Println("rawKmers sorted")
+	fmt.Println("sorting rawKmers")
+	rg.sortRawKmers(rawKmers, rawMinCounts)
+	fmt.Println("rawKmers sorted")
 
-    fmt.Println("generating RepeatGenome.Kmers")
-    rg.uniqKmers(rawKmers)
-    fmt.Println("done generating RepeatGenome.Kmers")
+	fmt.Println("generating RepeatGenome.Kmers")
+	rg.uniqKmers(rawKmers)
+	fmt.Println("done generating RepeatGenome.Kmers")
 
-    fmt.Println(comma(len(rg.Kmers)), "unique kmers processed")
+	fmt.Println(comma(len(rg.Kmers)), "unique kmers processed")
 
-    rawKmers = nil
-    runtime.GC()
+	rawKmers = nil
+	runtime.GC()
 
-    fmt.Println("generating RepeatGenome.MinCounts")
-    rg.MinCounts = make([]uint32, minSliceSize, minSliceSize)
-    for _, kmer := range rg.Kmers {
-        min := bioutils.Minimize(kmer.Int())
-        rg.MinCounts[min]++
-    }
-    fmt.Println("RepeatGenome.MinCounts generated")
+	fmt.Println("generating RepeatGenome.MinCounts")
+	rg.MinCounts = make([]uint32, minSliceSize, minSliceSize)
+	for _, kmer := range rg.Kmers {
+		min := bioutils.Minimize(kmer.Int())
+		rg.MinCounts[min]++
+	}
+	fmt.Println("RepeatGenome.MinCounts generated")
 
-    fmt.Println("generating RepeatGenome.MinOffsets")
-    rg.populateMinOffsets()
-    fmt.Println("rg.MinOffsets generated - done!")
+	fmt.Println("generating RepeatGenome.MinOffsets")
+	rg.populateMinOffsets()
+	fmt.Println("rg.MinOffsets generated - done!")
 }

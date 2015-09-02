@@ -7,17 +7,16 @@
 package repeatgenome
 
 import (
-    "bytes"
-    "fmt"
-    "github.com/plsql/jh-bio/bioutils"
-    "io/ioutil"
-    "log"
-    "os"
-    "runtime"
-    "runtime/pprof"
-    "strings"
+	"bytes"
+	"fmt"
+	"github.com/plsql/jh-bio/bioutils"
+	"io/ioutil"
+	"log"
+	"os"
+	"runtime"
+	"runtime/pprof"
+	"strings"
 )
-
 
 // minSliceSize is the size of a slice that contains an index for each possible
 // mMer.
@@ -35,13 +34,13 @@ var memProfFile *os.File
 // A value of type Config is passed to the New() function, which
 // constructs and returns a new RepeatGenome.
 type Config struct {
-    Name       string
-    Debug      bool
-    CPUProfile bool
-    MemProfile bool
-    WriteLib   bool
-    ForceGen   bool
-    WriteStats bool
+	Name       string
+	Debug      bool
+	CPUProfile bool
+	MemProfile bool
+	WriteLib   bool
+	ForceGen   bool
+	WriteStats bool
 }
 
 /*
@@ -71,20 +70,20 @@ type Config struct {
        excluding root, to its struct.
 */
 type RepeatGenome struct {
-    Name       string
-    chroms     Chroms
-    Kmers      Kmers
-    MinOffsets []int64
-    MinCounts  []uint32
-    SortedMins MinInts
-    Matches    bioutils.Matches
-    ClassTree  ClassTree
-    Repeats    Repeats
-    RepeatMap  map[string]*Repeat
-    // Maps a Match to its associated ClassNode.
-    // Currently used in read classification logic.
-    // Not exposed in API.
-    matchNodes map[*bioutils.Match]*ClassNode
+	Name       string
+	chroms     Chroms
+	Kmers      Kmers
+	MinOffsets []int64
+	MinCounts  []uint32
+	SortedMins MinInts
+	Matches    bioutils.Matches
+	ClassTree  ClassTree
+	Repeats    Repeats
+	RepeatMap  map[string]*Repeat
+	// Maps a Match to its associated ClassNode.
+	// Currently used in read classification logic.
+	// Not exposed in API.
+	matchNodes map[*bioutils.Match]*ClassNode
 }
 
 /*
@@ -102,11 +101,11 @@ type RepeatGenome struct {
        instances of this repeat.
 */
 type Repeat struct {
-    ID        uint64
-    Name      string
-    ClassList []string
-    ClassNode *ClassNode
-    Instances []*bioutils.Match
+	ID        uint64
+	Name      string
+	ClassList []string
+	ClassNode *ClassNode
+	Instances []*bioutils.Match
 }
 
 type Repeats []*Repeat
@@ -126,12 +125,12 @@ type Repeats []*Repeat
        Repeat, if it has one. This field is of dubious value.
 */
 type ClassNode struct {
-    Name     string
-    ID       ClassID
-    Class    []string
-    Parent   *ClassNode
-    Children []*ClassNode
-    Repeat   *Repeat
+	Name     string
+	ID       ClassID
+	Class    []string
+	Parent   *ClassNode
+	Children []*ClassNode
+	Repeat   *Repeat
 }
 
 type ClassNodes []*ClassNode
@@ -149,9 +148,9 @@ type ClassNodes []*ClassNode
        the RepeatMasker output.
 */
 type ClassTree struct {
-    ClassNodes map[string](*ClassNode)
-    NodesByID  []*ClassNode
-    Root       *ClassNode
+	ClassNodes map[string](*ClassNode)
+	NodesByID  []*ClassNode
+	Root       *ClassNode
 }
 
 /* A two-bits-per-base sequence of up to 31 bases, with low-order bits
@@ -207,8 +206,8 @@ type PKmers []*Kmer
    them.
 */
 type Seq struct {
-    Bytes []byte
-    Len   uint64
+	Bytes []byte
+	Len   uint64
 }
 
 type Seqs []Seq
@@ -218,244 +217,243 @@ type Seqs []Seq
 type Chroms map[string](map[string][]byte)
 
 func parseGenome(genomeName string) (error, Chroms) {
-    chromFileInfos, err := ioutil.ReadDir(genomeName + "-fasta")
-    if err != nil {
-        return fmt.Errorf("repeatgenome.parseGenome():" + err.Error()), nil
-    }
-    warned := false
-    chroms := make(map[string](map[string][]byte))
-    // used below to store the two keys for RepeatGenome.chroms
-    for i := range chromFileInfos {
-        chromFilename := chromFileInfos[i].Name()
-        chromName := chromFilename[:len(chromFilename)-3]
-        // "my_genome_name", "my_chrom_name"  ->  "my_genome_name/my_chrom_name"
-        chromFilepath := strings.Join([]string{genomeName + "-fasta", chromFilename}, "/")
-        // process the ref genome files (*.fa), not the repeat ref
-        // files (*.fa.out and *.fa.align) or anything else
-        infile, err := os.Open(chromFilepath)
-        if err != nil {
-            return err, nil
-        }
-        err, seqMap := bioutils.ReadFASTA(infile)
-        if err != nil {
-            return err, nil
-        }
+	chromFileInfos, err := ioutil.ReadDir(genomeName + "-fasta")
+	if err != nil {
+		return fmt.Errorf("repeatgenome.parseGenome():" + err.Error()), nil
+	}
+	warned := false
+	chroms := make(map[string](map[string][]byte))
+	// used below to store the two keys for RepeatGenome.chroms
+	for i := range chromFileInfos {
+		chromFilename := chromFileInfos[i].Name()
+		chromName := chromFilename[:len(chromFilename)-3]
+		// "my_genome_name", "my_chrom_name"  ->  "my_genome_name/my_chrom_name"
+		chromFilepath := strings.Join([]string{genomeName + "-fasta", chromFilename}, "/")
+		// process the ref genome files (*.fa), not the repeat ref
+		// files (*.fa.out and *.fa.align) or anything else
+		infile, err := os.Open(chromFilepath)
+		if err != nil {
+			return err, nil
+		}
+		err, seqMap := bioutils.ReadFASTA(infile)
+		if err != nil {
+			return err, nil
+		}
 
-        for seqName := range seqMap {
-            if warned {
-                break
-            }
-            if seqName != chromName {
-                fmt.Println("WARNING: reference genome is two-dimensional, containing sequences not named after their chromosome.")
-                fmt.Println("Because RepeatMasker supplied only one-dimensional indexing, this may cause unexpected behavior or program failure.")
-                fmt.Printf("seqName: %s\tlen(seqName): %d\n", seqName, len(seqName))
-                fmt.Printf("chrom name: %s\tlen(chrom name): %d\n", chromName, len(chromName))
-                warned = true
-            }
-        }
+		for seqName := range seqMap {
+			if warned {
+				break
+			}
+			if seqName != chromName {
+				fmt.Println("WARNING: reference genome is two-dimensional, containing sequences not named after their chromosome.")
+				fmt.Println("Because RepeatMasker supplied only one-dimensional indexing, this may cause unexpected behavior or program failure.")
+				fmt.Printf("seqName: %s\tlen(seqName): %d\n", seqName, len(seqName))
+				fmt.Printf("chrom name: %s\tlen(chrom name): %d\n", chromName, len(chromName))
+				warned = true
+			}
+		}
 
-        chroms[chromName] = make(map[string][]byte)
-        for seqName, seqBytes := range seqMap {
-            chroms[chromName][seqName] = bytes.ToLower(seqBytes)
-        }
-    }
-    return nil, chroms
+		chroms[chromName] = make(map[string][]byte)
+		for seqName, seqBytes := range seqMap {
+			chroms[chromName][seqName] = bytes.ToLower(seqBytes)
+		}
+	}
+	return nil, chroms
 }
 
 func New(config Config) (error, *RepeatGenome) {
-    debug = config.Debug
+	debug = config.Debug
 
+	runtime.GOMAXPROCS(numCPU)
 
-    runtime.GOMAXPROCS(numCPU)
+	// We popoulate the RepeatGenome mostly with helper functions.
+	// We should consider whether it makes more sense for them to
+	// alter the object directly, than to return their results.
+	rg := new(RepeatGenome)
+	rg.Name = config.Name
 
-    // We popoulate the RepeatGenome mostly with helper functions.
-    // We should consider whether it makes more sense for them to
-    // alter the object directly, than to return their results.
-    rg := new(RepeatGenome)
-    rg.Name = config.Name
+	var err error
 
-    var err error
+	if config.MemProfile {
+		os.Mkdir("profiles", os.ModePerm)
+		memProfFile, err = os.Create("profiles/" + rg.Name + ".memprof")
+		if err != nil {
+			return fmt.Errorf("repeatgenome.New():" + err.Error()), nil
+		}
+		pprof.WriteHeapProfile(memProfFile)
+		defer memProfFile.Close()
+	}
 
-    if config.MemProfile {
-        os.Mkdir("profiles", os.ModePerm)
-        memProfFile, err = os.Create("profiles/" + rg.Name + ".memprof")
-        if err != nil {
-            return fmt.Errorf("repeatgenome.New():" + err.Error()), nil
-        }
-        pprof.WriteHeapProfile(memProfFile)
-        defer memProfFile.Close()
-    }
+	err, rg.chroms = parseGenome(rg.Name)
+	if err != nil {
+		return err, nil
+	}
+	repeatMaskerFile, err := os.Open(rg.Name + "/" + rg.Name + ".fa.out")
+	if err != nil {
+		return err, nil
+	}
+	err, rg.Matches = bioutils.ParseMatches(repeatMaskerFile)
+	if err != nil {
+		return err, nil
+	}
+	rg.getRepeats()
+	rg.getClassTree()
 
-    err, rg.chroms = parseGenome(rg.Name)
-    if err != nil {
-        return err, nil
-    }
-    repeatMaskerFile, err := os.Open(rg.Name + "/" + rg.Name + ".fa.out")
-    if err != nil {
-        return err, nil
-    }
-    err, rg.Matches = bioutils.ParseMatches(repeatMaskerFile)
-    if err != nil {
-        return err, nil
-    }
-    rg.getRepeats()
-    rg.getClassTree()
+	if config.ForceGen {
+		rg.genKrakenLibVerbose()
+		err = rg.WriteKraken()
+		if err != nil {
+			return err, nil
+		}
+	} else {
+		krakenFile, err := os.Open(rg.Name + "-lib/" + rg.Name + ".kraken")
 
-    if config.ForceGen {
-        rg.genKrakenLibVerbose()
-        err = rg.WriteKraken()
-        if err != nil {
-            return err, nil
-        }
-    } else {
-        krakenFile, err := os.Open(rg.Name + "-lib/" + rg.Name + ".kraken")
+		if err == nil { // implies the file already exists
+			fmt.Println()
+			fmt.Println("Kraken library file exists - using contents")
+			err = rg.ReadKraken(krakenFile)
+			if err != nil {
+				return fmt.Errorf("repeatgenome.New():" + err.Error()), nil
+			}
+		} else if os.IsNotExist(err) { // the case that there isn't a written file yet
+			fmt.Println("Kraken library file doesn't exist - generating library")
+			fmt.Println()
+			rg.genKrakenLibVerbose()
+			err = rg.WriteKraken()
+			if err != nil {
+				return err, nil
+			}
+		} else { // otherwise we're dealing with a generic error of some sort
+			return err, nil
+		}
+	}
 
-        if err == nil { // implies the file already exists
-            fmt.Println()
-            fmt.Println("Kraken library file exists - using contents")
-            err = rg.ReadKraken(krakenFile)
-            if err != nil {
-                return fmt.Errorf("repeatgenome.New():" + err.Error()), nil
-            }
-        } else if os.IsNotExist(err) { // the case that there isn't a written file yet
-            fmt.Println("Kraken library file doesn't exist - generating library")
-            fmt.Println()
-            rg.genKrakenLibVerbose()
-            err = rg.WriteKraken()
-            if err != nil {
-                return err, nil
-            }
-        } else { // otherwise we're dealing with a generic error of some sort
-            return err, nil
-        }
-    }
+	if config.WriteStats {
+		err := rg.WriteStatData()
+		if err != nil {
+			return err, nil
+		}
 
-    if config.WriteStats {
-        err := rg.WriteStatData()
-        if err != nil {
-            return err, nil
-        }
+		err = rg.WriteClassJSON(false, false)
+		if err != nil {
+			return err, nil
+		}
+	}
 
-        err = rg.WriteClassJSON(false, false)
-        if err != nil {
-            return err, nil
-        }
-    }
+	if debug {
+		rg.RunDebugTests()
+	}
 
-    if debug {
-        rg.RunDebugTests()
-    }
-
-    return nil, rg
+	return nil, rg
 }
 
 func (rg *RepeatGenome) getRepeats() {
-    // we now populate a list of unique repeat types
-    // repeats are stored in the below slice, indexed by their ID
-    // We first determine the necessary size of the slice - we can't
-    // use append because matches are not sorted by repeatID.
+	// we now populate a list of unique repeat types
+	// repeats are stored in the below slice, indexed by their ID
+	// We first determine the necessary size of the slice - we can't
+	// use append because matches are not sorted by repeatID.
 
-    rg.RepeatMap = make(map[string]*Repeat)
+	rg.RepeatMap = make(map[string]*Repeat)
 
-    // DON'T use the second field of the range - this causes the Match
-    // struct to be copied.
-    // Creating an alias struct (match := rg.Matches[i]) of type Match
-    // rather than *Match causes the repeat.Instance item to point to
-    // a copy, not the original Match struct.
-    for i := range rg.Matches {
-        match := &rg.Matches[i]
-        // don't bother overwriting
-        if repeat, exists := rg.RepeatMap[match.RepeatName]; exists {
-            repeat.Instances = append(repeat.Instances, match)
-        } else {
-            repeat := Repeat{
-                ID:        uint64(len(rg.Repeats)),
-                ClassList: match.RepeatClass,
-                Name:      match.RepeatName,
-                Instances: []*bioutils.Match{match},
-            }
+	// DON'T use the second field of the range - this causes the Match
+	// struct to be copied.
+	// Creating an alias struct (match := rg.Matches[i]) of type Match
+	// rather than *Match causes the repeat.Instance item to point to
+	// a copy, not the original Match struct.
+	for i := range rg.Matches {
+		match := &rg.Matches[i]
+		// don't bother overwriting
+		if repeat, exists := rg.RepeatMap[match.RepeatName]; exists {
+			repeat.Instances = append(repeat.Instances, match)
+		} else {
+			repeat := Repeat{
+				ID:        uint64(len(rg.Repeats)),
+				ClassList: match.RepeatClass,
+				Name:      match.RepeatName,
+				Instances: []*bioutils.Match{match},
+			}
 
-            rg.Repeats = append(rg.Repeats, &repeat)
-            rg.RepeatMap[repeat.Name] = &repeat
-        }
-    }
+			rg.Repeats = append(rg.Repeats, &repeat)
+			rg.RepeatMap[repeat.Name] = &repeat
+		}
+	}
 }
 
 func (rg *RepeatGenome) getClassTree() {
-    // mapping to pointers allows us to make references (i.e. pointers) to values
-    tree := &rg.ClassTree
-    tree.ClassNodes = make(map[string](*ClassNode))
-    // would be prettier if expanded
-    tree.Root = &ClassNode{
-        Name:     "root",
-        ID:       0,
-        Class:    []string{"root"},
-        Parent:   nil,
-        Children: nil,
-        Repeat:   nil,
-    }
-    tree.ClassNodes["root"] = tree.Root
-    tree.NodesByID = append(tree.NodesByID, tree.Root)
+	// mapping to pointers allows us to make references (i.e. pointers) to values
+	tree := &rg.ClassTree
+	tree.ClassNodes = make(map[string](*ClassNode))
+	// would be prettier if expanded
+	tree.Root = &ClassNode{
+		Name:     "root",
+		ID:       0,
+		Class:    []string{"root"},
+		Parent:   nil,
+		Children: nil,
+		Repeat:   nil,
+	}
+	tree.ClassNodes["root"] = tree.Root
+	tree.NodesByID = append(tree.NodesByID, tree.Root)
 
-    for _, repeat := range rg.Repeats {
-        // process every heirarchy level (e.g. for "DNA/LINE/TiGGER",
-        // process "DNA", then "DNA/LINE", then "DNA/LINE/TiGGER")
-        for j := 1; j <= len(repeat.ClassList); j++ {
-            thisClass := repeat.ClassList[:j]
-            thisClassName := strings.Join(thisClass, "/")
-            _, keyExists := tree.ClassNodes[thisClassName]
-            if !keyExists {
-                if len(tree.NodesByID) > 65534 {
-                    panic("RepeatGenome.getClassTree(): more than 65,536 class nodes - ID is overflowed")
-                }
-                classNode := new(ClassNode)
-                classNode.Name = thisClassName
-                classNode.ID = ClassID(len(tree.NodesByID))
-                classNode.Class = thisClass
-                if repeat, exists := rg.RepeatMap[thisClassName]; exists {
-                    classNode.Repeat = repeat
-                }
+	for _, repeat := range rg.Repeats {
+		// process every heirarchy level (e.g. for "DNA/LINE/TiGGER",
+		// process "DNA", then "DNA/LINE", then "DNA/LINE/TiGGER")
+		for j := 1; j <= len(repeat.ClassList); j++ {
+			thisClass := repeat.ClassList[:j]
+			thisClassName := strings.Join(thisClass, "/")
+			_, keyExists := tree.ClassNodes[thisClassName]
+			if !keyExists {
+				if len(tree.NodesByID) > 65534 {
+					panic("RepeatGenome.getClassTree(): more than 65,536 class nodes - ID is overflowed")
+				}
+				classNode := new(ClassNode)
+				classNode.Name = thisClassName
+				classNode.ID = ClassID(len(tree.NodesByID))
+				classNode.Class = thisClass
+				if repeat, exists := rg.RepeatMap[thisClassName]; exists {
+					classNode.Repeat = repeat
+				}
 
-                tree.ClassNodes[thisClassName] = classNode
-                tree.NodesByID = append(tree.NodesByID, classNode)
-                // first case handles primary classes, as root is
-                // implicit and not listed in thisClass
-                if j == 1 {
-                    classNode.Parent = tree.Root
-                } else {
-                    classNode.Parent = tree.ClassNodes[strings.Join(thisClass[:len(thisClass)-1], "/")]
-                }
+				tree.ClassNodes[thisClassName] = classNode
+				tree.NodesByID = append(tree.NodesByID, classNode)
+				// first case handles primary classes, as root is
+				// implicit and not listed in thisClass
+				if j == 1 {
+					classNode.Parent = tree.Root
+				} else {
+					classNode.Parent = tree.ClassNodes[strings.Join(thisClass[:len(thisClass)-1], "/")]
+				}
 
-                if classNode.Parent.Children == nil {
-                    classNode.Parent.Children = make([]*ClassNode, 0)
-                }
-                classNode.Parent.Children = append(classNode.Parent.Children, tree.ClassNodes[thisClassName])
-            }
-        }
-    }
+				if classNode.Parent.Children == nil {
+					classNode.Parent.Children = make([]*ClassNode, 0)
+				}
+				classNode.Parent.Children = append(classNode.Parent.Children, tree.ClassNodes[thisClassName])
+			}
+		}
+	}
 
-    // MUST NOT USE RANGE - the struct will be copied!
-    for i := 0; i < len(rg.Repeats); i++ {
-        repeat := rg.Repeats[i]
-        repeat.ClassNode = tree.ClassNodes[repeat.Name]
+	// MUST NOT USE RANGE - the struct will be copied!
+	for i := 0; i < len(rg.Repeats); i++ {
+		repeat := rg.Repeats[i]
+		repeat.ClassNode = tree.ClassNodes[repeat.Name]
 
-        // cond. mostly for debugging - remove
-        if repeat.ClassNode == nil {
-            fmt.Println(repeat.Name)
-            log.Fatal("getClassTree(): nil Repeat.ClassNode")
-        }
-    }
+		// cond. mostly for debugging - remove
+		if repeat.ClassNode == nil {
+			fmt.Println(repeat.Name)
+			log.Fatal("getClassTree(): nil Repeat.ClassNode")
+		}
+	}
 
-    rg.matchNodes = make(map[*bioutils.Match]*ClassNode)
-    // MUST NOT USE RANGE - the struct will be copied!
-    for i := 0; i < len(rg.Matches); i++ {
-        match := &rg.Matches[i]
-        rg.matchNodes[match] = tree.ClassNodes[match.RepeatName]
+	rg.matchNodes = make(map[*bioutils.Match]*ClassNode)
+	// MUST NOT USE RANGE - the struct will be copied!
+	for i := 0; i < len(rg.Matches); i++ {
+		match := &rg.Matches[i]
+		rg.matchNodes[match] = tree.ClassNodes[match.RepeatName]
 
-        // cond. mostly for debugging - remove
-        if rg.matchNodes[match] == nil {
-            fmt.Println(match.RepeatName)
-            log.Fatal("getClassTree(): nil bioutils.Match.ClassNode")
-        }
-    }
+		// cond. mostly for debugging - remove
+		if rg.matchNodes[match] == nil {
+			fmt.Println(match.RepeatName)
+			log.Fatal("getClassTree(): nil bioutils.Match.ClassNode")
+		}
+	}
 }

@@ -1,48 +1,48 @@
 package bioutils
 
-import(
-    "bytes"
-    "fmt"
-    "io"
-    "io/ioutil"
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"io/ioutil"
 )
 
 /*
-    Ignores semicolon syntax for now.
+   Ignores semicolon syntax for now.
 
-    Could later use speed hack of accumulating slices and calling bytes.Join() at the end.
+   Could later use speed hack of accumulating slices and calling bytes.Join() at the end.
 */
 func ReadFASTA(reader io.Reader) (error, map[string][]byte) {
-    fileBytes, err := ioutil.ReadAll(reader)
-    if err != nil {
-        return err, nil
-    }
+	fileBytes, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return err, nil
+	}
 
-    seqMap := make(map[string][]byte)
-    var seqName string
-    for _, line := range bytes.Split(fileBytes, []byte{'\n'}) {
+	seqMap := make(map[string][]byte)
+	var seqName string
+	for _, line := range bytes.Split(fileBytes, []byte{'\n'}) {
 
-        line = bytes.TrimSpace(line)
-        if len(line) == 0 {
-            continue
-        }
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
 
-        // Hit an identifier line
-        if line[0] == '>' {
-            seqName = string(line[1:])
+		// Hit an identifier line
+		if line[0] == '>' {
+			seqName = string(line[1:])
 
-        } else {
-            // Append here since multi-line DNA strings are possible
-            if seqName == "" {
-                return fmt.Errorf("bioutils.ReadFASTAFile(): missing sequence name in FASTA file"), nil
-            }
-            for _, byt := range line {
-                seqMap[seqName] = append(seqMap[seqName], byt)
-            }
-        }
-    }
+		} else {
+			// Append here since multi-line DNA strings are possible
+			if seqName == "" {
+				return fmt.Errorf("bioutils.ReadFASTAFile(): missing sequence name in FASTA file"), nil
+			}
+			for _, byt := range line {
+				seqMap[seqName] = append(seqMap[seqName], byt)
+			}
+		}
+	}
 
-    return nil, seqMap
+	return nil, seqMap
 }
 
 /*

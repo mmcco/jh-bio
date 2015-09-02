@@ -2,6 +2,7 @@ package bioutils
 
 // K is the kmer size (in basepairs).
 const K = 31
+
 // M is the minimizer size, which must be <= k.
 const M = 15
 
